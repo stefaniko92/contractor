@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Forms\Components\TextInputSelectAffix;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
@@ -21,6 +22,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class CreateInvoicePage extends Page implements HasForms
 {
@@ -63,8 +65,8 @@ class CreateInvoicePage extends Page implements HasForms
                     'unit' => 'kom',
                     'quantity' => 1,
                     'unit_price' => 0.00,
-                    'discount_value' => 0,
-                    'discount_type' => 'percent',
+                    'discount_value' => null,
+                    'discount_value_unit' => 'percent',
                     'total' => 0.00,
                 ]
             ],
@@ -319,24 +321,14 @@ class CreateInvoicePage extends Page implements HasForms
                                     $this->calculateItemTotal($set, $get);
                                 }),
 
-                            TextInput::make('discount_value')
+                            TextInputSelectAffix::make('discount_value')
                                 ->label('Popust')
                                 ->numeric()
                                 ->step(0.01)
-                                ->default(0)
+                                ->default(null)
+                                ->placeholder('0')
                                 ->live(onBlur: true)
-                                ->afterStateUpdated(function ($state, $set, $get) {
-                                    $this->calculateItemTotal($set, $get);
-                                }),
-
-                            Select::make('discount_type')
-                                ->label('Tip')
-                                ->options([
-                                    'percent' => '%',
-                                    'fixed' => 'RSD',
-                                ])
-                                ->default('percent')
-                                ->live()
+                                ->withDiscountOptions()
                                 ->afterStateUpdated(function ($state, $set, $get) {
                                     $this->calculateItemTotal($set, $get);
                                 }),
@@ -388,7 +380,9 @@ class CreateInvoicePage extends Page implements HasForms
         $quantity = (float) ($get('quantity') ?? 0);
         $unitPrice = (float) ($get('unit_price') ?? 0);
         $discountValue = (float) ($get('discount_value') ?? 0);
-        $discountType = $get('discount_type') ?? 'percent';
+        
+        // The custom component creates 'discount_value_unit' for the select field
+        $discountType = $get('discount_value_unit') ?? 'percent';
 
         $subtotal = $quantity * $unitPrice;
 
@@ -410,7 +404,7 @@ class CreateInvoicePage extends Page implements HasForms
         $data = $this->data;
         
         // Debug: Log the form data
-        \Log::info('Form data:', $data);
+        Log::info('Form data:', $data);
         
         // Check if client_id is present
         if (!isset($data['client_id']) || empty($data['client_id'])) {
@@ -460,7 +454,7 @@ class CreateInvoicePage extends Page implements HasForms
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['unit_price'],
                     'discount_value' => $item['discount_value'] ?? 0,
-                    'discount_type' => $item['discount_type'] ?? 'percent',
+                    'discount_type' => $item['discount_value_unit'] ?? 'percent',
                     'amount' => $item['total'],
                 ]);
             }
