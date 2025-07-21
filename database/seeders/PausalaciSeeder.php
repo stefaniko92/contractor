@@ -9,7 +9,6 @@ use App\Models\Invoice;
 use App\Models\Obligation;
 use App\Models\User;
 use App\Models\UserCompany;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class PausalaciSeeder extends Seeder
@@ -21,7 +20,7 @@ class PausalaciSeeder extends Seeder
     {
         // Create a test user (pausalac)
         $user = User::firstOrCreate([
-            'email' => 'pausalac@test.com'
+            'email' => 'pausalac@test.com',
         ], [
             'name' => 'Marko Petrović',
             'password' => bcrypt('password'),
@@ -34,7 +33,7 @@ class PausalaciSeeder extends Seeder
 
         // Also add data for any existing admin users
         $allUsers = User::all();
-        
+
         foreach ($allUsers as $currentUser) {
             $this->createSampleDataForUser($currentUser);
         }
@@ -47,9 +46,9 @@ class PausalaciSeeder extends Seeder
             'user_id' => $user->id,
         ], [
             'company_name' => $user->company_name ?? 'Marko Petrović PR',
-            'company_full_name' => ($user->company_name ?? 'Marko Petrović PR') . ' - Preduzetnik',
+            'company_full_name' => ($user->company_name ?? 'Marko Petrović PR').' - Preduzetnik',
             'company_tax_id' => $user->tax_id ?? '123456789',
-            'company_registry_number' => '62' . str_pad(rand(1000000, 9999999), 7, '0', STR_PAD_LEFT),
+            'company_registry_number' => '62'.str_pad(rand(1000000, 9999999), 7, '0', STR_PAD_LEFT),
             'company_activity_code' => '6201',
             'company_activity_desc' => 'Računarske programske delatnosti',
             'company_registration_date' => now()->subYears(rand(1, 5)),
@@ -120,7 +119,7 @@ class PausalaciSeeder extends Seeder
             // Create some sample invoices
             $invoices = [
                 [
-                    'invoice_number' => 'INV-' . date('Y') . '-' . $user->id . '-' . $client->id . '-' . str_pad(rand(1, 99), 2, '0', STR_PAD_LEFT),
+                    'invoice_number' => 'INV-'.date('Y').'-'.$user->id.'-'.$client->id.'-'.str_pad(rand(1, 99), 2, '0', STR_PAD_LEFT),
                     'amount' => rand(50000, 500000),
                     'description' => 'Usluge konsaltinga i razvoja softvera',
                     'currency' => 'RSD',
@@ -129,7 +128,7 @@ class PausalaciSeeder extends Seeder
                     'status' => rand(0, 1) ? 'paid' : 'unpaid',
                 ],
                 [
-                    'invoice_number' => 'INV-' . date('Y') . '-' . $user->id . '-' . $client->id . '-' . str_pad(rand(100, 199), 2, '0', STR_PAD_LEFT),
+                    'invoice_number' => 'INV-'.date('Y').'-'.$user->id.'-'.$client->id.'-'.str_pad(rand(100, 199), 2, '0', STR_PAD_LEFT),
                     'amount' => rand(75000, 300000),
                     'description' => 'Mesečne usluge održavanja sistema',
                     'currency' => 'RSD',
@@ -154,7 +153,7 @@ class PausalaciSeeder extends Seeder
                     ], [
                         'amount' => $invoice->amount,
                         'date' => $invoice->issue_date->addDays(rand(1, 10)),
-                        'description' => 'Plaćanje za fakturu ' . $invoice->invoice_number,
+                        'description' => 'Plaćanje za fakturu '.$invoice->invoice_number,
                     ]);
                 }
             }

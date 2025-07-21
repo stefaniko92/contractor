@@ -16,6 +16,15 @@ class Client extends Model
         'email',
         'phone',
         'notes',
+        'is_domestic',
+        'city',
+        'country',
+        'vat_number',
+        'registration_number',
+    ];
+
+    protected $casts = [
+        'is_domestic' => 'boolean',
     ];
 
     public function user(): BelongsTo

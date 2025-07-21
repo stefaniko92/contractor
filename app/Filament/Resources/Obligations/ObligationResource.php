@@ -18,6 +18,16 @@ class ObligationResource extends Resource
 {
     protected static ?string $model = Obligation::class;
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Moja kompanija';
+
+    protected static ?string $navigationLabel = 'Zaduženja';
+
+    protected static ?string $modelLabel = 'Zaduženje';
+
+    protected static ?string $pluralModelLabel = 'Zaduženja';
+
+    protected static ?int $navigationSort = 60;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     public static function form(Schema $schema): Schema

@@ -18,11 +18,15 @@ class ClientResource extends Resource
 {
     protected static ?string $model = Client::class;
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Fakturisanje';
+
     protected static ?string $navigationLabel = 'Klijenti';
-    
+
     protected static ?string $modelLabel = 'Klijent';
-    
+
     protected static ?string $pluralModelLabel = 'Klijenti';
+
+    protected static ?int $navigationSort = 20;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 

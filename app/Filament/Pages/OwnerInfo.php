@@ -2,15 +2,15 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Pages\Page;
-use Filament\Forms\Concerns\InteractsWithForms;
-use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Components\TextInput;
+use App\Models\CompanyOwner;
+use App\Models\UserCompany;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use App\Models\UserCompany;
-use App\Models\CompanyOwner;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
+use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 
 class OwnerInfo extends Page implements HasForms
@@ -18,8 +18,11 @@ class OwnerInfo extends Page implements HasForms
     use InteractsWithForms;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Moja kompanija';
+
     protected static ?string $navigationLabel = 'Podaci o vlasniku';
+
     protected static ?string $title = 'Podaci o vlasniku';
+
     protected string $view = 'filament.pages.owner-info';
 
     public ?array $data = [];

@@ -2,15 +2,15 @@
 
 namespace App\Livewire;
 
-use Filament\Widgets\Widget;
-use Filament\Forms\Concerns\InteractsWithForms;
-use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Components\TextInput;
+use App\Models\CompanyOwner;
+use App\Models\UserCompany;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use App\Models\UserCompany;
-use App\Models\CompanyOwner;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
+use Filament\Widgets\Widget;
 use Illuminate\Support\Facades\Auth;
 
 class OwnerInfoForm extends Widget implements HasForms

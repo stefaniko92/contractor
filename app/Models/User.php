@@ -29,6 +29,8 @@ class User extends Authenticatable
         'phone',
         'default_currency',
         'logo_path',
+        'swift_code',
+        'iban',
     ];
 
     /**

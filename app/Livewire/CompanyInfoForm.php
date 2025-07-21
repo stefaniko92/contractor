@@ -2,16 +2,16 @@
 
 namespace App\Livewire;
 
-use Filament\Widgets\Widget;
+use App\Models\UserCompany;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\FileUpload;
-use App\Models\UserCompany;
 use Filament\Notifications\Notification;
+use Filament\Widgets\Widget;
 use Illuminate\Support\Facades\Auth;
 
 class CompanyInfoForm extends Widget implements HasForms

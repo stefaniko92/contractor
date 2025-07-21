@@ -2,16 +2,16 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Pages\Page;
+use App\Models\UserCompany;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\FileUpload;
-use App\Models\UserCompany;
 use Filament\Notifications\Notification;
+use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 
 class CompanyInfo extends Page implements HasForms
@@ -19,8 +19,11 @@ class CompanyInfo extends Page implements HasForms
     use InteractsWithForms;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Moja kompanija';
+
     protected static ?string $navigationLabel = 'Podaci o kompaniji';
+
     protected static ?string $title = 'Podaci o kompaniji';
+
     protected string $view = 'filament.pages.company-info';
 
     public ?array $data = [];

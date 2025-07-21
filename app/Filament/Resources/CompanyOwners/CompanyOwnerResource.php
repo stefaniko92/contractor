@@ -19,11 +19,11 @@ class CompanyOwnerResource extends Resource
     protected static ?string $model = CompanyOwner::class;
 
     protected static ?string $navigationLabel = 'Vlasnik kompanije';
-    
+
     protected static ?string $modelLabel = 'Vlasnik kompanije';
-    
+
     protected static ?string $pluralModelLabel = 'Vlasnici kompanija';
-    
+
     protected static bool $shouldRegisterNavigation = false;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUser;

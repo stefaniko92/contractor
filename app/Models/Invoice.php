@@ -17,8 +17,10 @@ class Invoice extends Model
         'currency',
         'issue_date',
         'due_date',
+        'trading_place',
         'status',
         'pdf_path',
+        'invoice_type',
     ];
 
     protected $casts = [
@@ -40,5 +42,46 @@ class Invoice extends Model
     public function incomes(): HasMany
     {
         return $this->hasMany(Income::class);
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(InvoiceItem::class);
+    }
+
+    public static function generateInvoiceNumber(int $userId, ?int $year = null): string
+    {
+        $year = $year ?? now()->year;
+
+        $count = static::where('user_id', $userId)
+            ->whereYear('issue_date', $year)
+            ->count();
+
+        return ($count + 1).'/'.$year;
+    }
+
+    public function updateAmount(): void
+    {
+        $totalAmount = $this->items()->sum('amount');
+        $this->updateQuietly(['amount' => $totalAmount]);
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($invoice) {
+            if (empty($invoice->invoice_number)) {
+                $invoice->invoice_number = static::generateInvoiceNumber(
+                    $invoice->user_id,
+                    $invoice->issue_date ? $invoice->issue_date->year : now()->year
+                );
+            }
+        });
+
+        static::saved(function ($invoice) {
+            $invoice->updateAmount();
+        });
+
     }
 }

@@ -19,11 +19,11 @@ class UserCompanyResource extends Resource
     protected static ?string $model = UserCompany::class;
 
     protected static ?string $navigationLabel = 'Profil kompanije';
-    
+
     protected static ?string $modelLabel = 'Profil kompanije';
-    
+
     protected static ?string $pluralModelLabel = 'Profili kompanija';
-    
+
     protected static bool $shouldRegisterNavigation = false;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
