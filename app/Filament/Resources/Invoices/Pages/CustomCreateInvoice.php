@@ -8,7 +8,7 @@ use App\Models\Invoice;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Radio;
-use Filament\Forms\Components\Section;
+use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -41,6 +41,7 @@ class CustomCreateInvoice extends Page implements HasForms
     {
         $this->data = [
             'invoice_type' => 'domestic',
+            'invoice_document_type' => 'faktura',
             'issue_date' => now()->format('Y-m-d'),
             'due_date' => now()->addDays(30)->format('Y-m-d'),
             'currency' => 'RSD',
@@ -53,8 +54,20 @@ class CustomCreateInvoice extends Page implements HasForms
         return $form
             ->schema([
                 Section::make('Tip fakture')
-                    ->description('Izaberite tip fakture na osnovu lokacije klijenta')
+                    ->description('Izaberite tip fakture na osnovu lokacije klijenta i vrstu dokumenta')
                     ->schema([
+                        Radio::make('invoice_document_type')
+                            ->label('Tip dokumenta')
+                            ->options([
+                                'faktura' => 'Faktura',
+                                'profaktura' => 'Profaktura',
+                                'avansna_faktura' => 'Avansna Faktura',
+                            ])
+                            ->default('faktura')
+                            ->required()
+                            ->inline()
+                            ->columnSpanFull(),
+
                         Radio::make('invoice_type')
                             ->label('Tip fakture')
                             ->options([
@@ -165,6 +178,7 @@ class CustomCreateInvoice extends Page implements HasForms
             'user_id' => Auth::id(),
             'client_id' => $data['client_id'],
             'invoice_type' => $data['invoice_type'],
+            'invoice_document_type' => $data['invoice_document_type'],
             'issue_date' => $data['issue_date'],
             'due_date' => $data['due_date'],
             'trading_place' => $data['trading_place'],

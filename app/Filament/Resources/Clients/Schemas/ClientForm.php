@@ -4,7 +4,8 @@ namespace App\Filament\Resources\Clients\Schemas;
 
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
-use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Select;
+use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
@@ -21,8 +22,19 @@ class ClientForm
 
                 Section::make('Tip klijenta')
                     ->schema([
-                        Radio::make('is_domestic')
+                        Radio::make('client_type')
                             ->label('Tip klijenta')
+                            ->options([
+                                'pravno_lice' => 'Pravno lice',
+                                'fizicko_lice' => 'Fizičko lice',
+                                'javno_preduzece' => 'Javno preduzeće',
+                            ])
+                            ->default('pravno_lice')
+                            ->required()
+                            ->live(),
+                            
+                        Radio::make('is_domestic')
+                            ->label('Lokacija klijenta')
                             ->options([
                                 1 => 'Domaći klijent',
                                 0 => 'Strani klijent',
@@ -30,7 +42,8 @@ class ClientForm
                             ->default(1)
                             ->required()
                             ->live(),
-                    ]),
+                    ])
+                    ->columnSpanFull(),
 
                 Section::make('Osnovne informacije')
                     ->schema([
@@ -42,6 +55,10 @@ class ClientForm
                         TextInput::make('tax_id')
                             ->label('PIB')
                             ->maxLength(255),
+                            
+                        TextInput::make('registration_number')
+                            ->label('Matični broj')
+                            ->maxLength(255),
 
                         TextInput::make('email')
                             ->label('Email')
@@ -52,13 +69,19 @@ class ClientForm
                             ->label('Telefon')
                             ->tel()
                             ->maxLength(255),
+                            
+                        TextInput::make('default_place_of_sale')
+                            ->label('Uobičajeno mesto prometa')
+                            ->maxLength(255)
+                            ->default('Beograd'),
 
                         Textarea::make('address')
                             ->label('Adresa')
                             ->rows(3)
                             ->columnSpanFull(),
                     ])
-                    ->columns(2),
+                    ->columns(2)
+                    ->columnSpanFull(),
 
                 Section::make('Informacije za strane klijente')
                     ->schema([
@@ -74,11 +97,20 @@ class ClientForm
                             ->label('VAT/EIB broj')
                             ->maxLength(255),
 
-                        TextInput::make('registration_number')
-                            ->label('ID/MB broj')
-                            ->maxLength(255),
+                        Select::make('currency')
+                            ->label('Valuta za fakture')
+                            ->options([
+                                'EUR' => 'EUR - Evro',
+                                'USD' => 'USD - Američki dolar',
+                                'GBP' => 'GBP - Britanska funta',
+                                'CHF' => 'CHF - Švajcarski franak',
+                                'RSD' => 'RSD - Srpski dinar',
+                            ])
+                            ->default('EUR')
+                            ->required(),
                     ])
                     ->columns(2)
+                    ->columnSpanFull()
                     ->visible(fn ($get) => $get('is_domestic') === 0),
 
                 Section::make('Dodatne informacije')
@@ -87,8 +119,9 @@ class ClientForm
                             ->label('Napomene')
                             ->rows(4)
                             ->columnSpanFull(),
-                    ]),
+                    ])
+                    ->columnSpanFull(),
             ])
-            ->columns(2);
+            ->columns(1);
     }
 }

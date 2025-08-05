@@ -265,7 +265,14 @@ class CreateInvoicePage extends Page implements HasForms
                             'USD' => 'USD - Američki dolar',
                         ])
                         ->default('RSD')
-                        ->required(),
+                        ->required()
+                        ->live()
+                        ->afterStateUpdated(function ($state, $set, $get) {
+                            // Update discount type options based on currency
+                            $this->updateDiscountTypeOptions($state);
+                            // Recalculate all item totals
+                            $this->recalculateAllTotals();
+                        }),
 
                     Textarea::make('description')
                         ->label('Opis')
@@ -287,17 +294,28 @@ class CreateInvoicePage extends Page implements HasForms
                                     'product' => 'Proizvod',
                                 ])
                                 ->default('service')
+                                ->columnSpan(2)
                                 ->required(),
 
                             TextInput::make('description')
                                 ->label('Naziv')
                                 ->required()
-                                ->columnSpan(2),
+                                ->columnSpan(3),
 
-                            TextInput::make('unit')
+                            Select::make('unit')
                                 ->label('Jedinica')
-                                ->default('kom')
-                                ->required(),
+                                ->options([
+                                    'kom' => 'komad',
+                                    'sat' => 'sat',
+                                    'm' => 'm',
+                                    'm2' => 'm2',
+                                    'm3' => 'm3',
+                                    'kg' => 'kg',
+                                    'l' => 'l',
+                                    'pak' => 'pak',
+                                    'reč' => 'reč',
+                                    'dan' => 'dan'
+                                ]),
 
                             TextInput::make('quantity')
                                 ->label('Količina')
@@ -307,17 +325,19 @@ class CreateInvoicePage extends Page implements HasForms
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function ($state, $set, $get) {
                                     $this->calculateItemTotal($set, $get);
-                                }),
+                                })
+                                ->columnSpan(1),
 
                             TextInput::make('unit_price')
-                                ->label('Jedinična cena')
+                                ->label('Cena')
                                 ->numeric()
                                 ->step(0.01)
                                 ->required()
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function ($state, $set, $get) {
                                     $this->calculateItemTotal($set, $get);
-                                }),
+                                })
+                                ->columnSpan(2),
 
                             TextInput::make('discount_value')
                                 ->label('Popust')
@@ -327,19 +347,24 @@ class CreateInvoicePage extends Page implements HasForms
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function ($state, $set, $get) {
                                     $this->calculateItemTotal($set, $get);
-                                }),
+                                })
+                                ->columnSpan(1),
 
                             Select::make('discount_type')
-                                ->label('Tip')
-                                ->options([
-                                    'percent' => '%',
-                                    'fixed' => 'RSD',
-                                ])
+                                ->label('Tip pop.')
+                                ->options(function () {
+                                    $currency = $this->data['currency'] ?? 'RSD';
+                                    return [
+                                        'percent' => '%',
+                                        'fixed' => $currency,
+                                    ];
+                                })
                                 ->default('percent')
                                 ->live()
                                 ->afterStateUpdated(function ($state, $set, $get) {
                                     $this->calculateItemTotal($set, $get);
-                                }),
+                                })
+                                ->columnSpan(1),
 
                             TextInput::make('total')
                                 ->label('Ukupno')
@@ -347,9 +372,10 @@ class CreateInvoicePage extends Page implements HasForms
                                 ->step(0.01)
                                 ->disabled()
                                 ->dehydrated()
-                                ->default(0),
+                                ->default(0)
+                                ->columnSpan(1),
                         ])
-                        ->columns(8)
+                        ->columns(12)
                         ->columnSpanFull()
                         ->defaultItems(1)
                         ->collapsible()
@@ -485,5 +511,38 @@ class CreateInvoicePage extends Page implements HasForms
                 ->color('primary')
             ->extraAttributes(['style' => 'margin-top: 20px']),
         ];
+    }
+
+    protected function updateDiscountTypeOptions(string $currency): void
+    {
+        // This method is called when currency changes
+        // The discount_type options will be automatically updated via the reactive options() function
+        
+        // Force form to refresh discount type fields
+        $this->form->fill($this->data);
+    }
+
+    protected function recalculateAllTotals(): void
+    {
+        // Recalculate totals for all invoice items when currency changes
+        if (isset($this->data['invoice_items']) && is_array($this->data['invoice_items'])) {
+            foreach ($this->data['invoice_items'] as $index => $item) {
+                $quantity = (float) ($item['quantity'] ?? 0);
+                $unitPrice = (float) ($item['unit_price'] ?? 0);
+                $discountValue = (float) ($item['discount_value'] ?? 0);
+                $discountType = $item['discount_type'] ?? 'percent';
+
+                $subtotal = $quantity * $unitPrice;
+
+                if ($discountType === 'percent') {
+                    $discount = $subtotal * ($discountValue / 100);
+                } else {
+                    $discount = $discountValue;
+                }
+
+                $total = $subtotal - $discount;
+                $this->data['invoice_items'][$index]['total'] = max(0, round($total, 2));
+            }
+        }
     }
 }

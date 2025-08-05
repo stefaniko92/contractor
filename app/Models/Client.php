@@ -17,10 +17,13 @@ class Client extends Model
         'phone',
         'notes',
         'is_domestic',
+        'client_type',
+        'default_place_of_sale',
         'city',
         'country',
         'vat_number',
         'registration_number',
+        'currency',
     ];
 
     protected $casts = [

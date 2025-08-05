@@ -26,9 +26,9 @@ class ClientResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Klijenti';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 13;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
 
     public static function form(Schema $schema): Schema
     {
