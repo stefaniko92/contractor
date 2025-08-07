@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\AvansnaFakturas;
 
 use App\Filament\Resources\AvansnaFakturas\Pages\CreateAvansnaFaktura;
+use App\Filament\Resources\AvansnaFakturas\Pages\CustomCreateAvansnaFaktura;
 use App\Filament\Resources\AvansnaFakturas\Pages\EditAvansnaFaktura;
 use App\Filament\Resources\AvansnaFakturas\Pages\ListAvansnaFakturas;
 use App\Filament\Resources\AvansnaFakturas\Schemas\AvansnaFakturaForm;
@@ -58,6 +59,7 @@ class AvansnaFakturaResource extends Resource
         return [
             'index' => ListAvansnaFakturas::route('/'),
             'create' => CreateAvansnaFaktura::route('/create'),
+            'custom-create' => CustomCreateAvansnaFaktura::route('/custom-create'),
             'edit' => EditAvansnaFaktura::route('/{record}/edit'),
         ];
     }

@@ -14,7 +14,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
+use Filament\Schemas\Schema;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use Illuminate\Support\Facades\Auth;
@@ -45,13 +45,13 @@ class CustomCreateInvoice extends Page implements HasForms
             'issue_date' => now()->format('Y-m-d'),
             'due_date' => now()->addDays(30)->format('Y-m-d'),
             'currency' => 'RSD',
-            'status' => 'draft',
+            'status' => 'in_preparation',
         ];
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
+        return $schema
             ->schema([
                 Section::make('Tip fakture')
                     ->description('Izaberite tip fakture na osnovu lokacije klijenta i vrstu dokumenta')
@@ -184,7 +184,7 @@ class CustomCreateInvoice extends Page implements HasForms
             'trading_place' => $data['trading_place'],
             'currency' => $data['currency'],
             'description' => $data['description'],
-            'status' => 'draft',
+            'status' => 'in_preparation',
             'amount' => 0,
         ]);
 

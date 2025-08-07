@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Profakturas\Pages;
 
 use App\Filament\Resources\Profakturas\ProfakturaResource;
+use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
@@ -13,7 +14,11 @@ class ListProfakturas extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            Action::make('custom_create')
+                ->label('Nova Profaktura')
+                ->url(ProfakturaResource::getUrl('custom-create'))
+                ->icon('heroicon-o-plus')
+                ->color('primary'),
         ];
     }
 }

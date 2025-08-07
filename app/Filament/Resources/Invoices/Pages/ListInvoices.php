@@ -15,12 +15,10 @@ class ListInvoices extends ListRecords
     {
         return [
             Action::make('custom-create')
-                ->label('Nova faktura (Custom)')
+                ->label('Nova faktura')
                 ->url(fn (): string => '/admin/create-invoice-page')
                 ->icon('heroicon-o-plus')
-                ->color('primary'),
-            CreateAction::make()
-                ->label('Nova faktura (Standard)'),
+                ->color('primary')
         ];
     }
 }

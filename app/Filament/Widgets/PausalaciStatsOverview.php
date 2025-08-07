@@ -26,9 +26,9 @@ class PausalaciStatsOverview extends StatsOverviewWidget
         $remainingLimit = $pausalaciLimit - $annualIncome;
         $percentageUsed = ($annualIncome / $pausalaciLimit) * 100;
 
-        // Count unpaid invoices
+        // Count uncharged invoices (neplaćene)
         $unpaidInvoices = Invoice::where('user_id', $userId)
-            ->where('status', 'unpaid')
+            ->where('status', 'uncharged')
             ->count();
 
         // Count pending obligations

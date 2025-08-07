@@ -2,8 +2,8 @@
 
 return [
     'groups' => [
-        'my_company' => 'Моя компания',
         'invoicing' => 'Выставление счетов',
+        'my_company' => 'Моя компания',
     ],
 
     'fakturisanje' => 'Выставление счетов',

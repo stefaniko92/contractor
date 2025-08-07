@@ -36,6 +36,8 @@ class CreateInvoicePage extends Page implements HasForms
 
     protected static ?string $title = 'Nova Faktura';
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?int $navigationSort = 15;
 
     public ?array $data = [];
@@ -55,7 +57,7 @@ class CreateInvoicePage extends Page implements HasForms
             'trading_place' => 'Beograd',
             'currency' => 'RSD',
             'description' => null,
-            'status' => 'unpaid',
+            'status' => 'in_preparation',
             'invoice_items' => [
                 [
                     'type' => 'service',
@@ -463,7 +465,7 @@ class CreateInvoicePage extends Page implements HasForms
             'trading_place' => $data['trading_place'],
             'currency' => $data['currency'],
             'description' => $data['description'],
-            'status' => 'unpaid',
+            'status' => 'in_preparation',
             'amount' => $totalAmount,
         ];
 

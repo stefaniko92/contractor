@@ -32,7 +32,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Blue,
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
@@ -60,13 +60,12 @@ class AdminPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->navigationGroups([
-                NavigationGroup::make()
-                    ->label(__('navigation.fakturisanje'))
+                NavigationGroup::make('Fakturisanje')
                     ->icon('heroicon-o-document-text'),
-                NavigationGroup::make()
-                    ->label(__('navigation.moja_kompanija'))
+                NavigationGroup::make('Moja kompanija')
                     ->icon('heroicon-o-building-office'),
             ])
+            ->sidebarCollapsibleOnDesktop()
             ->renderHook(
                 PanelsRenderHook::USER_MENU_BEFORE,
                 fn () => view('filament.components.language-switcher')

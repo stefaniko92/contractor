@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Profakturas;
 
 use App\Filament\Resources\Profakturas\Pages\CreateProfaktura;
+use App\Filament\Resources\Profakturas\Pages\CustomCreateProfaktura;
 use App\Filament\Resources\Profakturas\Pages\EditProfaktura;
 use App\Filament\Resources\Profakturas\Pages\ListProfakturas;
 use App\Filament\Resources\Profakturas\Schemas\ProfakturaForm;
@@ -58,6 +59,7 @@ class ProfakturaResource extends Resource
         return [
             'index' => ListProfakturas::route('/'),
             'create' => CreateProfaktura::route('/create'),
+            'custom-create' => CustomCreateProfaktura::route('/custom-create'),
             'edit' => EditProfaktura::route('/{record}/edit'),
         ];
     }

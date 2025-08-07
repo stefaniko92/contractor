@@ -131,6 +131,19 @@ class InvoiceForm
                             ->required()
                             ->live(),
 
+                        Select::make('status')
+                            ->label('Status')
+                            ->options([
+                                'sent' => 'Poslana',
+                                'issued' => 'Izdata',
+                                'in_preparation' => 'U pripremi',
+                                'charged' => 'Naplaćena',
+                                'uncharged' => 'Nenaplaćena',
+                                'storned' => 'Stornirana',
+                            ])
+                            ->default('in_preparation')
+                            ->required(),
+
                         Textarea::make('description')
                             ->label('Opis')
                             ->nullable()
