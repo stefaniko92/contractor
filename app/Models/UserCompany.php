@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class UserCompany extends Model
@@ -26,8 +27,6 @@ class UserCompany extends Model
         'company_phone',
         'company_email',
         'show_email_on_invoice',
-        'company_foreign_account_number',
-        'company_foreign_account_bank',
         'company_logo_path',
     ];
 
@@ -44,5 +43,10 @@ class UserCompany extends Model
     public function companyOwner(): HasOne
     {
         return $this->hasOne(CompanyOwner::class);
+    }
+
+    public function bankAccounts(): HasMany
+    {
+        return $this->hasMany(BankAccount::class);
     }
 }

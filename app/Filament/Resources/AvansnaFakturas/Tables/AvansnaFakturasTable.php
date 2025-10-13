@@ -166,6 +166,31 @@ class AvansnaFakturasTable
                             // TODO: Implement copy functionality
                         }),
                     
+                    Action::make('issue')
+                        ->label('Izdaj fakturu')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Izdaj avansnu fakturu')
+                        ->modalDescription(function ($record) {
+                            return "Da li želite da izdajete avansnu fakturu {$record->invoice_number}? Status će biti promenjen na 'Izdata'.";
+                        })
+                        ->modalSubmitActionLabel('Izdaj')
+                        ->modalIcon('heroicon-o-check-circle')
+                        ->visible(function ($record) {
+                            // Only show issue action for avansna fakturas in preparation
+                            return !$record->is_storno && $record->status === 'in_preparation';
+                        })
+                        ->action(function ($record) {
+                            $record->update(['status' => 'issued']);
+                            
+                            Notification::make()
+                                ->title('Avansna faktura izdata')
+                                ->body("Avansna faktura {$record->invoice_number} je uspešno izdata.")
+                                ->success()
+                                ->send();
+                        }),
+                    
                     Action::make('storno')
                         ->label('Storniraj')
                         ->icon('heroicon-o-x-mark')
@@ -173,13 +198,13 @@ class AvansnaFakturasTable
                         ->requiresConfirmation()
                         ->modalHeading('Storniraj avansnu fakturu')
                         ->modalDescription(function ($record) {
-                            return "Da li ste sigurni da želite da stornirate avansnu fakturu {$record->invoice_number}? Biće kreirana nova storno avansna faktura sa negativnim iznosima u skladu sa srpskim zakonskim propisima. Obe avansne fakture će biti zabeležene u knjizi prihoda.";
+                            return "Da li ste sigurni da želite da stornirate avansnu fakturu {$record->invoice_number}? Biće kreirana nova storno avansna faktura sa negativnim iznosima u skladu sa srpskim zakonskim propisima. Obe avansne fakture će biti zabeležene u knjigi prihoda.";
                         })
                         ->modalSubmitActionLabel('Storniraj')
                         ->modalIcon('heroicon-o-exclamation-triangle')
                         ->visible(function ($record) {
-                            // Only show storno action for avansna fakturas that are not storno invoices themselves and don't already have a storno
-                            return !$record->is_storno && $record->stornoInvoices()->count() === 0;
+                            // Only show storno action for issued avansna fakturas that are not storno invoices themselves and don't already have a storno
+                            return !$record->is_storno && $record->status !== 'in_preparation' && $record->stornoInvoices()->count() === 0;
                         })
                         ->action(function ($record) {
                             // Create storno (reversal) avansna faktura with negative amounts
@@ -193,7 +218,7 @@ class AvansnaFakturasTable
                                 'trading_place' => $record->trading_place,
                                 'currency' => $record->currency,
                                 'description' => 'Storno avansne fakture ' . $record->invoice_number . ' od ' . $record->issue_date->format('d.m.Y'),
-                                'status' => 'issued',
+                                'status' => 'storned',
                                 'amount' => -$record->amount, // Negative amount
                                 'is_storno' => true,
                                 'original_invoice_id' => $record->id,
@@ -218,8 +243,8 @@ class AvansnaFakturasTable
                                 ]);
                             }
 
-                            // Update original avansna faktura status to storned
-                            $record->update(['status' => 'storned']);
+                            // Update original avansna faktura status to charged (since stornoing implies it was paid)
+                            $record->update(['status' => 'charged']);
                             
                             Notification::make()
                                 ->title('Storno avansna faktura kreirana')

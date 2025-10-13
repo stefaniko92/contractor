@@ -109,9 +109,17 @@ class CustomCreateProfaktura extends Page implements HasForms
                             ->searchable()
                             ->required()
                             ->live()
-                            ->afterStateUpdated(function ($state) {
+                            ->afterStateUpdated(function ($state, $set) {
                                 $this->selectedClientId = $state;
                                 $this->dispatch('client-updated');
+
+                                // Auto-set currency from client's default
+                                if ($state) {
+                                    $client = Client::find($state);
+                                    if ($client && $client->currency) {
+                                        $set('currency', $client->currency);
+                                    }
+                                }
                             })
                             ->createOptionForm([
                                 TextInput::make('company_name')
@@ -135,17 +143,35 @@ class CustomCreateProfaktura extends Page implements HasForms
                                 TextInput::make('registration_number')
                                     ->label('ID/MB broj')
                                     ->visible(fn () => $this->invoice_type === 'foreign'),
+                                Select::make('currency')
+                                    ->label('Podrazumevana valuta')
+                                    ->options([
+                                        'RSD' => 'RSD - Srpski dinar',
+                                        'EUR' => 'EUR - Evro',
+                                        'USD' => 'USD - Američki dolar',
+                                        'GBP' => 'GBP - Britanska funta',
+                                        'CHF' => 'CHF - Švajcarski franak',
+                                    ])
+                                    ->default($this->invoice_type === 'foreign' ? 'EUR' : 'RSD')
+                                    ->required(),
                                 TextInput::make('email')
                                     ->label('Email')
                                     ->email(),
                                 TextInput::make('phone')
                                     ->label('Telefon'),
                             ])
-                            ->createOptionUsing(function (array $data) {
+                            ->createOptionUsing(function (array $data, $set) {
                                 $data['user_id'] = Auth::id();
                                 $data['is_domestic'] = $this->invoice_type === 'domestic';
 
-                                return Client::create($data)->id;
+                                $client = Client::create($data);
+
+                                // Auto-set invoice currency from newly created client
+                                if ($client->currency) {
+                                    $set('currency', $client->currency);
+                                }
+
+                                return $client->id;
                             }),
 
                         TextInput::make('invoice_number')
@@ -396,7 +422,7 @@ class CustomCreateProfaktura extends Page implements HasForms
             ->statePath('data');
     }
 
-    public function create(): void
+    public function createInvoice(string $status): void
     {
         // Validate form data
         $this->form->validate();
@@ -413,12 +439,6 @@ class CustomCreateProfaktura extends Page implements HasForms
             return;
         }
         
-        // Calculate total amount from items
-        $totalAmount = 0;
-        if (isset($data['invoice_items'])) {
-            $totalAmount = collect($data['invoice_items'])->sum('total');
-        }
-
         $invoiceData = [
             'user_id' => Auth::id(),
             'client_id' => $data['client_id'],
@@ -429,8 +449,8 @@ class CustomCreateProfaktura extends Page implements HasForms
             'trading_place' => $data['trading_place'],
             'currency' => $data['currency'],
             'description' => $data['description'],
-            'status' => 'in_preparation',
-            'amount' => $totalAmount,
+            'status' => $status,
+            'amount' => 0, // Will be updated automatically after items are created
         ];
 
         // Add custom invoice number if provided, otherwise auto-generate
@@ -457,15 +477,42 @@ class CustomCreateProfaktura extends Page implements HasForms
                     'amount' => $item['total'],
                 ]);
             }
+            
+            // Update invoice amount after all items are created
+            $invoice->updateAmount();
         }
 
+        // Show different notifications based on action
+        $messages = [
+            'in_preparation' => [
+                'title' => 'Profaktura je sačuvana',
+                'body' => "Profaktura broj {$invoice->invoice_number} je sačuvana kao nacrt. Možete je kasnije izdati."
+            ],
+            'issued' => [
+                'title' => 'Profaktura je izdata',
+                'body' => "Profaktura broj {$invoice->invoice_number} je uspešno izdata i spremna za slanje."
+            ],
+            'sent' => [
+                'title' => 'Profaktura je izdata i poslana',
+                'body' => "Profaktura broj {$invoice->invoice_number} je uspešno izdata i označena kao poslana."
+            ]
+        ];
+
+        $message = $messages[$status] ?? $messages['in_preparation'];
+
         Notification::make()
-            ->title('Profaktura je uspešno kreirana')
-            ->body("Kreirana profaktura broj: {$invoice->invoice_number}")
+            ->title($message['title'])
+            ->body($message['body'])
             ->success()
             ->send();
 
         $this->redirect(ProfakturaResource::getUrl('edit', ['record' => $invoice->id]));
+    }
+    
+    // Keep the old create method for backward compatibility
+    public function create(): void
+    {
+        $this->createInvoice('in_preparation');
     }
 
     public function calculateItemTotal($set, $get): void
@@ -523,11 +570,40 @@ class CustomCreateProfaktura extends Page implements HasForms
     protected function getFormActions(): array
     {
         return [
-            Action::make('create')
-                ->label('Kreiraj profakturu')
-                ->submit('create')
+            Action::make('save')
+                ->label('Sačuvaj')
+                ->icon('heroicon-o-document')
+                ->color('gray')
+                ->action('saveAsDraft'),
+            
+            Action::make('issue')
+                ->label('Izdaj profakturu')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->action('issueInvoice'),
+                
+            Action::make('send')
+                ->label('Izdaj i pošalji')
+                ->icon('heroicon-o-paper-airplane')
+                ->color('primary')
+                ->action('issueAndSend')
                 ->keyBindings(['mod+s']),
         ];
+    }
+
+    public function saveAsDraft(): void
+    {
+        $this->createInvoice('in_preparation');
+    }
+
+    public function issueInvoice(): void
+    {
+        $this->createInvoice('issued');
+    }
+
+    public function issueAndSend(): void
+    {
+        $this->createInvoice('sent');
     }
 
     protected function getHeaderActions(): array

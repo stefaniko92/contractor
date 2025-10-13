@@ -24,22 +24,22 @@ class OwnerInfoForm extends Widget implements HasForms
     protected function getFormSchema(): array
     {
         return [
-            TextInput::make('first_name')->label('First Name')->required(),
-            TextInput::make('last_name')->label('Last Name')->required(),
-            TextInput::make('parent_name')->label('Parent Name'),
-            TextInput::make('nationality')->label('Nationality'),
-            TextInput::make('personal_id_number')->label('Personal ID Number'),
-            TextInput::make('education_level')->label('Education Level'),
-            Select::make('gender')->label('Gender')->options([
-                'male' => 'Male',
-                'female' => 'Female',
-                'other' => 'Other',
+            TextInput::make('first_name')->label(__('owner.fields.first_name'))->required(),
+            TextInput::make('last_name')->label(__('owner.fields.last_name'))->required(),
+            TextInput::make('parent_name')->label(__('owner.fields.parent_name')),
+            TextInput::make('nationality')->label(__('owner.fields.nationality')),
+            TextInput::make('personal_id_number')->label(__('owner.fields.personal_id_number')),
+            TextInput::make('education_level')->label(__('owner.fields.education_level')),
+            Select::make('gender')->label(__('owner.fields.gender'))->options([
+                'male' => __('owner.gender_options.male'),
+                'female' => __('owner.gender_options.female'),
+                'other' => __('owner.gender_options.other'),
             ]),
-            TextInput::make('city')->label('City'),
-            TextInput::make('municipality')->label('Municipality'),
-            Textarea::make('address')->label('Address'),
-            TextInput::make('address_number')->label('Address Number'),
-            TextInput::make('email')->label('Email')->email(),
+            TextInput::make('city')->label(__('owner.fields.city')),
+            TextInput::make('municipality')->label(__('owner.fields.municipality')),
+            Textarea::make('address')->label(__('owner.fields.address')),
+            TextInput::make('address_number')->label(__('owner.fields.address_number')),
+            TextInput::make('email')->label(__('owner.fields.email'))->email(),
         ];
     }
 
@@ -56,12 +56,12 @@ class OwnerInfoForm extends Widget implements HasForms
             );
 
             Notification::make()
-                ->title('Owner info saved!')
+                ->title(__('owner.notifications.saved'))
                 ->success()
                 ->send();
         } else {
             Notification::make()
-                ->title('Please fill company info first.')
+                ->title(__('owner.notifications.company_required'))
                 ->danger()
                 ->send();
         }

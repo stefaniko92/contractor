@@ -141,6 +141,30 @@ class ProfakturasTable
                 EditAction::make()
                     ->icon('heroicon-o-pencil'),
                 
+                Action::make('create_invoice')
+                    ->label('Kreiraj fakturu')
+                    ->icon('heroicon-o-document-text')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading('Kreiraj fakturu od profakture')
+                    ->modalDescription(function ($record) {
+                        return "Da li želite da kreirate fakturu na osnovu profakture {$record->invoice_number}? Svi podaci će biti kopirani u novu fakturu.";
+                    })
+                    ->modalSubmitActionLabel('Kreiraj fakturu')
+                    ->modalIcon('heroicon-o-document-text')
+                    ->visible(function ($record) {
+                        // Only show for non-storno profakturas
+                        return !$record->is_storno;
+                    })
+                    ->action(function ($record) {
+                        // Redirect to invoice creation form with prepopulated data
+                        return redirect()->to(
+                            '/admin/create-invoice-page?' . http_build_query([
+                                'copy_from_profaktura' => $record->id,
+                            ])
+                        );
+                    }),
+                
                 ActionGroup::make([
                     Action::make('print')
                         ->label('Štampaj')
@@ -166,6 +190,31 @@ class ProfakturasTable
                             // TODO: Implement copy functionality
                         }),
                     
+                    Action::make('issue')
+                        ->label('Izdaj profakturu')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Izdaj profakturu')
+                        ->modalDescription(function ($record) {
+                            return "Da li želite da izdajete profakturu {$record->invoice_number}? Status će biti promenjen na 'Izdata'.";
+                        })
+                        ->modalSubmitActionLabel('Izdaj')
+                        ->modalIcon('heroicon-o-check-circle')
+                        ->visible(function ($record) {
+                            // Only show issue action for profakturas in preparation
+                            return !$record->is_storno && $record->status === 'in_preparation';
+                        })
+                        ->action(function ($record) {
+                            $record->update(['status' => 'issued']);
+                            
+                            Notification::make()
+                                ->title('Profaktura izdata')
+                                ->body("Profaktura {$record->invoice_number} je uspešno izdata.")
+                                ->success()
+                                ->send();
+                        }),
+                    
                     Action::make('storno')
                         ->label('Storniraj')
                         ->icon('heroicon-o-x-mark')
@@ -178,8 +227,8 @@ class ProfakturasTable
                         ->modalSubmitActionLabel('Storniraj')
                         ->modalIcon('heroicon-o-exclamation-triangle')
                         ->visible(function ($record) {
-                            // Only show storno action for profakturas that are not storno invoices themselves and don't already have a storno
-                            return !$record->is_storno && $record->stornoInvoices()->count() === 0;
+                            // Only show storno action for issued profakturas that are not storno invoices themselves and don't already have a storno
+                            return !$record->is_storno && $record->status !== 'in_preparation' && $record->stornoInvoices()->count() === 0;
                         })
                         ->action(function ($record) {
                             // Create storno (reversal) profaktura with negative amounts
@@ -193,7 +242,7 @@ class ProfakturasTable
                                 'trading_place' => $record->trading_place,
                                 'currency' => $record->currency,
                                 'description' => 'Storno profakture ' . $record->invoice_number . ' od ' . $record->issue_date->format('d.m.Y'),
-                                'status' => 'issued',
+                                'status' => 'storned',
                                 'amount' => -$record->amount, // Negative amount
                                 'is_storno' => true,
                                 'original_invoice_id' => $record->id,
@@ -218,8 +267,8 @@ class ProfakturasTable
                                 ]);
                             }
 
-                            // Update original profaktura status to storned
-                            $record->update(['status' => 'storned']);
+                            // Update original profaktura status to charged (since stornoing implies it was paid)
+                            $record->update(['status' => 'charged']);
                             
                             Notification::make()
                                 ->title('Storno profaktura kreirana')

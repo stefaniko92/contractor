@@ -20,15 +20,21 @@ class AvansnaFakturaResource extends Resource
 {
     protected static ?string $model = Invoice::class;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Fakturisanje';
-
-    protected static ?string $navigationLabel = 'Avansne fakture';
-
     protected static ?string $modelLabel = 'Avansna faktura';
 
     protected static ?string $pluralModelLabel = 'Avansne fakture';
 
-    protected static ?int $navigationSort = 12;
+    protected static ?int $navigationSort = 3;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return __('navigation.fakturisanje');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('navigation.menu_items.avansi');
+    }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
 

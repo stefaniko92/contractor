@@ -1,4 +1,4 @@
-<div class="fi-dropdown fi-user-menu" x-data="{ open: false }">
+<div class="fi-dropdown fi-user-menu" x-data="{ open: false }" @language-changed.window="window.location.reload()">
     <button 
         @click="open = !open"
         type="button"

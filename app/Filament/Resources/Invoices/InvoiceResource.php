@@ -19,15 +19,21 @@ class InvoiceResource extends Resource
 {
     protected static ?string $model = Invoice::class;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Fakturisanje';
-
-    protected static ?string $navigationLabel = 'Fakture';
-
     protected static ?string $modelLabel = 'Faktura';
 
     protected static ?string $pluralModelLabel = 'Fakture';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 1;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return __('navigation.fakturisanje');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('navigation.menu_items.invoices');
+    }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentCheck;
 

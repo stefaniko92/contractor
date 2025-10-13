@@ -27,7 +27,7 @@ class Client extends Model
     ];
 
     protected $casts = [
-        'is_domestic' => 'boolean',
+        // Removed 'is_domestic' => 'boolean' cast to work properly with integer radio options
     ];
 
     public function user(): BelongsTo

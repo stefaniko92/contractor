@@ -20,15 +20,21 @@ class ProfakturaResource extends Resource
 {
     protected static ?string $model = Invoice::class;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Fakturisanje';
-
-    protected static ?string $navigationLabel = 'Profakture';
-
     protected static ?string $modelLabel = 'Profaktura';
 
     protected static ?string $pluralModelLabel = 'Profakture';
 
-    protected static ?int $navigationSort = 11;
+    protected static ?int $navigationSort = 2;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return __('navigation.fakturisanje');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('navigation.menu_items.profakture');
+    }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 

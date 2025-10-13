@@ -65,15 +65,15 @@ class ClientsTable
                 TextColumn::make('is_domestic')
                     ->label('Lokacija')
                     ->badge()
-                    ->color(fn (bool $state): string => $state ? 'success' : 'info')
-                    ->formatStateUsing(fn (bool $state): string => $state ? 'Domaći' : 'Strani')
+                    ->color(fn ($state): string => $state ? 'success' : 'info')
+                    ->formatStateUsing(fn ($state): string => $state ? 'Domaći' : 'Strani')
                     ->toggleable(),
                 TextColumn::make('currency')
                     ->label('Valuta')
                     ->badge()
                     ->color('gray')
                     ->toggleable()
-                    ->visible(fn ($record): bool => $record && !$record->is_domestic),
+                    ->visible(fn ($record): bool => $record && $record->is_domestic == 0),
                 TextColumn::make('email')
                     ->label('Email')
                     ->searchable()
@@ -92,7 +92,7 @@ class ClientsTable
                     ->label('VAT/EIB')
                     ->searchable()
                     ->toggleable()
-                    ->visible(fn ($record): bool => $record && !$record->is_domestic),
+                    ->visible(fn ($record): bool => $record && $record->is_domestic == 0),
                 TextColumn::make('default_place_of_sale')
                     ->label('Mesto prometa')
                     ->searchable()

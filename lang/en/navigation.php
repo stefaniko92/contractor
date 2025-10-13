@@ -13,12 +13,17 @@ return [
         // My Company
         'company_info' => 'Company Info',
         'owner_info' => 'Owner Info',
+        'bank_accounts' => 'Bank Accounts',
+        'documents' => 'Documents',
+        'kpo_books' => 'KPO Book',
         'incomes' => 'Incomes',
         'obligations' => 'Obligations',
 
         // Invoicing
         'invoices' => 'Invoices',
         'clients' => 'Clients',
+        'profakture' => 'Proforma Invoices',
+        'avansi' => 'Advance Invoices',
     ],
 
     'singular' => [

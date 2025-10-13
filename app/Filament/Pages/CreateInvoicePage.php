@@ -32,9 +32,15 @@ class CreateInvoicePage extends Page implements HasForms
 
     protected static string|\UnitEnum|null $navigationGroup = 'Fakturisanje';
 
-    protected static ?string $navigationLabel = 'Nova Faktura';
+    public static function getNavigationLabel(): string
+    {
+        return __('create_invoice.navigation_label');
+    }
 
-    protected static ?string $title = 'Nova Faktura';
+    public function getTitle(): string
+    {
+        return __('create_invoice.title');
+    }
 
     protected static bool $shouldRegisterNavigation = false;
 
@@ -71,19 +77,113 @@ class CreateInvoicePage extends Page implements HasForms
                 ]
             ],
         ];
+
+        // Handle copying from existing invoice
+        if (request()->has('copy_from_invoice')) {
+            $invoiceId = request()->get('copy_from_invoice');
+            $sourceInvoice = Invoice::with('items', 'client')->find($invoiceId);
+            
+            if ($sourceInvoice) {
+                $this->data = [
+                    'invoice_type' => $sourceInvoice->invoice_type,
+                    'client_id' => $sourceInvoice->client_id,
+                    'invoice_number' => '',
+                    'issue_date' => now()->format('Y-m-d'),
+                    'due_date' => now()->addDays(30)->format('Y-m-d'),
+                    'trading_place' => $sourceInvoice->trading_place,
+                    'currency' => $sourceInvoice->currency,
+                    'description' => $sourceInvoice->description,
+                    'status' => 'in_preparation',
+                    'invoice_items' => $sourceInvoice->items->map(function ($item) {
+                        return [
+                            'type' => $item->type,
+                            'description' => $item->description,
+                            'unit' => $item->unit,
+                            'quantity' => $item->quantity,
+                            'unit_price' => $item->unit_price,
+                            'discount_value' => $item->discount_value,
+                            'discount_type' => $item->discount_type,
+                            'total' => $item->amount,
+                        ];
+                    })->toArray(),
+                ];
+                
+                $this->invoice_type = $sourceInvoice->invoice_type;
+                $this->client_id = $sourceInvoice->client_id;
+                
+                $documentTypeLabel = match($sourceInvoice->invoice_document_type) {
+                    'faktura' => __('create_invoice.document_types.faktura'),
+                    'profaktura' => __('create_invoice.document_types.profaktura'),
+                    'avansna_faktura' => __('create_invoice.document_types.avansna_faktura'),
+                    default => __('create_invoice.document_types.default')
+                };
+
+                Notification::make()
+                    ->title(__('create_invoice.notifications.copied_from_invoice.title'))
+                    ->body(__('create_invoice.notifications.copied_from_invoice.body', [
+                        'type' => $documentTypeLabel,
+                        'number' => $sourceInvoice->invoice_number
+                    ]))
+                    ->success()
+                    ->send();
+            }
+        }
+
+        // Handle copying from profaktura  
+        if (request()->has('copy_from_profaktura')) {
+            $profakturaId = request()->get('copy_from_profaktura');
+            $profaktura = Invoice::with('items', 'client')->find($profakturaId);
+            
+            if ($profaktura && $profaktura->invoice_document_type === 'profaktura') {
+                $this->data = [
+                    'invoice_type' => $profaktura->invoice_type,
+                    'client_id' => $profaktura->client_id,
+                    'invoice_number' => '',
+                    'issue_date' => now()->format('Y-m-d'),
+                    'due_date' => now()->addDays(30)->format('Y-m-d'),
+                    'trading_place' => $profaktura->trading_place,
+                    'currency' => $profaktura->currency,
+                    'description' => 'Faktura na osnovu profakture ' . $profaktura->invoice_number . ' od ' . $profaktura->issue_date->format('d.m.Y'),
+                    'status' => 'in_preparation',
+                    'invoice_items' => $profaktura->items->map(function ($item) {
+                        return [
+                            'type' => $item->type,
+                            'description' => $item->description,
+                            'unit' => $item->unit,
+                            'quantity' => $item->quantity,
+                            'unit_price' => $item->unit_price,
+                            'discount_value' => $item->discount_value,
+                            'discount_type' => $item->discount_type,
+                            'total' => $item->amount,
+                        ];
+                    })->toArray(),
+                ];
+                
+                $this->invoice_type = $profaktura->invoice_type;
+                $this->client_id = $profaktura->client_id;
+                
+                Notification::make()
+                    ->title(__('create_invoice.notifications.copied_from_profaktura.title'))
+                    ->body(__('create_invoice.notifications.copied_from_profaktura.body', [
+                        'number' => $profaktura->invoice_number
+                    ]))
+                    ->success()
+                    ->send();
+            }
+        }
     }
 
     protected function getFormSchema(): array
     {
         return [
-            Section::make('Tip fakture')
-                ->description('Izaberite tip fakture na osnovu lokacije klijenta')
+            Section::make(__('create_invoice.sections.invoice_type.title'))
+                ->description(__('create_invoice.sections.invoice_type.description'))
                 ->schema([
                     Radio::make('invoice_type')
-                        ->label('Tip fakture')
+                        ->label(__('create_invoice.fields.invoice_type.label'))
                         ->options([
-                            'domestic' => 'Domaća faktura',
-                            'foreign' => 'Inostrana faktura',
+                            'domestic' => __('create_invoice.fields.invoice_type.options.domestic'),
+                            'foreign' => __('create_invoice.fields.invoice_type.options.foreign'),
                         ])
                         ->default('domestic')
                         ->live()
@@ -93,12 +193,12 @@ class CreateInvoicePage extends Page implements HasForms
                         }),
                 ]),
 
-            Section::make('Izbor klijenta')
-                ->description('Izaberite postojeći klijent ili kreirajte novi')
+            Section::make(__('create_invoice.sections.client_selection.title'))
+                ->description(__('create_invoice.sections.client_selection.description'))
                 ->schema([
                     Select::make('client_id')
-                        ->label('Klijenti')
-                        ->placeholder('Pretraži klijente...')
+                        ->label(__('create_invoice.fields.client_id.label'))
+                        ->placeholder(__('create_invoice.fields.client_id.placeholder'))
                         ->options(function () {
                             $isDomestic = $this->invoice_type === 'domestic';
 
@@ -113,52 +213,78 @@ class CreateInvoicePage extends Page implements HasForms
                         ->afterStateUpdated(function ($state, $set) {
                             $this->client_id = $state;
                             $set('client_id', $state);
+
+                            // Auto-set currency from client's default
+                            if ($state) {
+                                $client = Client::find($state);
+                                if ($client && $client->currency) {
+                                    $set('currency', $client->currency);
+                                }
+                            }
                         })
                         ->createOptionForm([
                             TextInput::make('company_name')
-                                ->label('Naziv kompanije')
+                                ->label(__('create_invoice.client_form.company_name'))
                                 ->required(),
                             TextInput::make('tax_id')
-                                ->label('PIB')
+                                ->label(__('create_invoice.client_form.tax_id'))
                                 ->required(),
                             TextInput::make('address')
-                                ->label('Adresa')
+                                ->label(__('create_invoice.client_form.address'))
                                 ->required(),
                             TextInput::make('city')
-                                ->label('Grad')
+                                ->label(__('create_invoice.client_form.city'))
                                 ->visible(fn () => $this->invoice_type === 'foreign'),
                             TextInput::make('country')
-                                ->label('Zemlja')
+                                ->label(__('create_invoice.client_form.country'))
                                 ->visible(fn () => $this->invoice_type === 'foreign'),
                             TextInput::make('vat_number')
-                                ->label('VAT/EIB broj')
+                                ->label(__('create_invoice.client_form.vat_number'))
                                 ->visible(fn () => $this->invoice_type === 'foreign'),
                             TextInput::make('registration_number')
-                                ->label('ID/MB broj')
+                                ->label(__('create_invoice.client_form.registration_number'))
                                 ->visible(fn () => $this->invoice_type === 'foreign'),
+                            Select::make('currency')
+                                ->label('Podrazumevana valuta')
+                                ->options([
+                                    'RSD' => 'RSD - Srpski dinar',
+                                    'EUR' => 'EUR - Evro',
+                                    'USD' => 'USD - Američki dolar',
+                                    'GBP' => 'GBP - Britanska funta',
+                                    'CHF' => 'CHF - Švajcarski franak',
+                                ])
+                                ->default($this->invoice_type === 'foreign' ? 'EUR' : 'RSD')
+                                ->required(),
                             TextInput::make('email')
-                                ->label('Email')
+                                ->label(__('create_invoice.client_form.email'))
                                 ->email(),
                             TextInput::make('phone')
-                                ->label('Telefon'),
+                                ->label(__('create_invoice.client_form.phone')),
                         ])
-                        ->createOptionUsing(function (array $data) {
+                        ->createOptionUsing(function (array $data, $set) {
                             $data['user_id'] = Auth::id();
                             $data['is_domestic'] = $this->invoice_type === 'domestic';
 
-                            return Client::create($data)->id;
+                            $client = Client::create($data);
+
+                            // Auto-set invoice currency from newly created client
+                            if ($client->currency) {
+                                $set('currency', $client->currency);
+                            }
+
+                            return $client->id;
                         })
                         ->columnSpanFull(),
                 ]),
 
-            Section::make('Informacije o učesnicima')
-                ->description('Podaci o vašoj kompaniji i klijentu')
+            Section::make(__('create_invoice.sections.participants_info.title'))
+                ->description(__('create_invoice.sections.participants_info.description'))
                 ->schema([
                     Placeholder::make('company_info')
-                        ->label('Izdavalac (Vaša kompanija)')
+                        ->label(__('create_invoice.fields.company_info.label'))
                         ->content(function () {
                             $user = Auth::user();
-                            
+
                             $info = [];
                             $info[] = $user->company_name ?? 'SR Software Niš';
                             $info[] = 'STEFAN RAKIĆ PR RAČUNARSKO PROGRAMIRANJE SR SOFTWARE NIŠ';
@@ -167,7 +293,7 @@ class CreateInvoicePage extends Page implements HasForms
                             $info[] = 'E-mail: ' . ($user->email ?? 'stefanrakic92@gmail.com');
                             $info[] = 'PIB: 109270190';
                             $info[] = 'MB: 64056891';
-                            
+
                             // Show SWIFT and IBAN for foreign invoices
                             if (($this->data['invoice_type'] ?? 'domestic') === 'foreign') {
                                 if ($user->swift_code) {
@@ -177,31 +303,31 @@ class CreateInvoicePage extends Page implements HasForms
                                     $info[] = 'IBAN: ' . $user->iban;
                                 }
                             }
-                            
-                            return new \Illuminate\Support\HtmlString('<div class="space-y-1">' . 
-                                implode('<br>', array_map(fn($line) => '<div>' . e($line) . '</div>', $info)) . 
+
+                            return new \Illuminate\Support\HtmlString('<div class="space-y-1">' .
+                                implode('<br>', array_map(fn($line) => '<div>' . e($line) . '</div>', $info)) .
                             '</div>');
                         })
                         ->columnSpan(1),
 
                     Placeholder::make('client_info')
-                        ->label('Kupac (Klijent)')
+                        ->label(__('create_invoice.fields.client_info.label'))
                         ->content(function () {
                             $clientId = $this->data['client_id'] ?? null;
-                            
+
                             if (!$clientId) {
-                                return 'Izaberite klijenta da vidite informacije';
+                                return __('create_invoice.fields.client_info.select_client');
                             }
 
                             $client = Client::find($clientId);
                             if (!$client) {
-                                return 'Klijent nije pronađen';
+                                return __('create_invoice.fields.client_info.not_found');
                             }
 
                             $info = [];
                             $info[] = $client->company_name;
                             $info[] = $client->address;
-                            
+
                             if ($client->city) {
                                 $city = $client->city;
                                 if ($client->country) {
@@ -209,62 +335,62 @@ class CreateInvoicePage extends Page implements HasForms
                                 }
                                 $info[] = $city;
                             }
-                            
+
                             if ($client->email) {
                                 $info[] = 'E-mail: ' . $client->email;
                             }
-                            
+
                             if ($client->phone) {
                                 $info[] = 'Telefon: ' . $client->phone;
                             }
-                            
+
                             if ($client->tax_id) {
                                 $info[] = 'PIB: ' . $client->tax_id;
                             }
-                            
+
                             if ($client->registration_number) {
                                 $info[] = 'MB: ' . $client->registration_number;
                             }
-                            
+
                             if ($client->vat_number) {
                                 $info[] = 'VAT/EIB: ' . $client->vat_number;
                             }
 
-                            return new \Illuminate\Support\HtmlString('<div class="space-y-1">' . 
-                                implode('<br>', array_map(fn($line) => '<div>' . e($line) . '</div>', $info)) . 
+                            return new \Illuminate\Support\HtmlString('<div class="space-y-1">' .
+                                implode('<br>', array_map(fn($line) => '<div>' . e($line) . '</div>', $info)) .
                             '</div>');
                         })
                         ->columnSpan(1),
                 ])
                 ->columns(2),
 
-            Section::make('Osnovne informacije fakture')
+            Section::make(__('create_invoice.sections.basic_info.title'))
                 ->schema([
                     TextInput::make('invoice_number')
-                        ->label('Broj fakture')
-                        ->placeholder('Ostavite prazno za automatsko generisanje')
-                        ->helperText('Ako ne unesete broj, automatski će se generisati'),
+                        ->label(__('create_invoice.fields.invoice_number.label'))
+                        ->placeholder(__('create_invoice.fields.invoice_number.placeholder'))
+                        ->helperText(__('create_invoice.fields.invoice_number.helper')),
 
                     DatePicker::make('issue_date')
-                        ->label('Datum izdavanja')
+                        ->label(__('create_invoice.fields.issue_date.label'))
                         ->required()
                         ->default(now()),
 
                     DatePicker::make('due_date')
-                        ->label('Datum dospeća')
+                        ->label(__('create_invoice.fields.due_date.label'))
                         ->required()
                         ->default(now()->addDays(30)),
 
                     TextInput::make('trading_place')
-                        ->label('Mesto prometa')
+                        ->label(__('create_invoice.fields.trading_place.label'))
                         ->default('Beograd'),
 
                     Select::make('currency')
-                        ->label('Valuta')
+                        ->label(__('create_invoice.fields.currency.label'))
                         ->options([
-                            'RSD' => 'RSD - Srpski dinar',
-                            'EUR' => 'EUR - Evro',
-                            'USD' => 'USD - Američki dolar',
+                            'RSD' => __('create_invoice.currencies.RSD'),
+                            'EUR' => __('create_invoice.currencies.EUR'),
+                            'USD' => __('create_invoice.currencies.USD'),
                         ])
                         ->default('RSD')
                         ->required()
@@ -277,50 +403,52 @@ class CreateInvoicePage extends Page implements HasForms
                         }),
 
                     Textarea::make('description')
-                        ->label('Opis')
+                        ->label(__('create_invoice.fields.description.label'))
                         ->nullable()
                         ->columnSpanFull(),
                 ])
                 ->columns(2),
 
-            Section::make('Stavke fakture')
-                ->description('Dodajte stavke sa cenama')
+            Section::make(__('create_invoice.sections.invoice_items.title'))
+                ->description(__('create_invoice.sections.invoice_items.description'))
                 ->schema([
                     Repeater::make('invoice_items')
-                        ->label('Stavke')
+                        ->label(__('create_invoice.fields.invoice_items.label'))
                         ->schema([
                             Select::make('type')
-                                ->label('Tip')
+                                ->label(__('create_invoice.fields.invoice_items.type'))
+                                ->selectablePlaceholder(false)
                                 ->options([
-                                    'service' => 'Usluga',
-                                    'product' => 'Proizvod',
+                                    'service' => __('create_invoice.item_types.service'),
+                                    'product' => __('create_invoice.item_types.product'),
                                 ])
                                 ->default('service')
                                 ->columnSpan(2)
                                 ->required(),
 
                             TextInput::make('description')
-                                ->label('Naziv')
+                                ->label(__('create_invoice.fields.invoice_items.description'))
                                 ->required()
                                 ->columnSpan(3),
 
                             Select::make('unit')
-                                ->label('Jedinica')
+                                ->label(__('create_invoice.fields.invoice_items.unit'))
+                                ->selectablePlaceholder(false)
                                 ->options([
-                                    'kom' => 'komad',
-                                    'sat' => 'sat',
-                                    'm' => 'm',
-                                    'm2' => 'm2',
-                                    'm3' => 'm3',
-                                    'kg' => 'kg',
-                                    'l' => 'l',
-                                    'pak' => 'pak',
-                                    'reč' => 'reč',
-                                    'dan' => 'dan'
+                                    'kom' => __('create_invoice.units.kom'),
+                                    'sat' => __('create_invoice.units.sat'),
+                                    'm' => __('create_invoice.units.m'),
+                                    'm2' => __('create_invoice.units.m2'),
+                                    'm3' => __('create_invoice.units.m3'),
+                                    'kg' => __('create_invoice.units.kg'),
+                                    'l' => __('create_invoice.units.l'),
+                                    'pak' => __('create_invoice.units.pak'),
+                                    'reč' => __('create_invoice.units.reč'),
+                                    'dan' => __('create_invoice.units.dan')
                                 ]),
 
                             TextInput::make('quantity')
-                                ->label('Količina')
+                                ->label(__('create_invoice.fields.invoice_items.quantity'))
                                 ->numeric()
                                 ->default(1)
                                 ->required()
@@ -331,7 +459,7 @@ class CreateInvoicePage extends Page implements HasForms
                                 ->columnSpan(1),
 
                             TextInput::make('unit_price')
-                                ->label('Cena')
+                                ->label(__('create_invoice.fields.invoice_items.unit_price'))
                                 ->numeric()
                                 ->step(0.01)
                                 ->required()
@@ -342,7 +470,7 @@ class CreateInvoicePage extends Page implements HasForms
                                 ->columnSpan(2),
 
                             TextInput::make('discount_value')
-                                ->label('Popust')
+                                ->label(__('create_invoice.fields.invoice_items.discount'))
                                 ->numeric()
                                 ->step(0.01)
                                 ->default(0)
@@ -353,12 +481,12 @@ class CreateInvoicePage extends Page implements HasForms
                                 ->columnSpan(1),
 
                             Select::make('discount_type')
-                                ->label('Tip pop.')
+                                ->label(__('create_invoice.fields.invoice_items.discount_type'))
                                 ->options(function () {
                                     $currency = $this->data['currency'] ?? 'RSD';
                                     return [
-                                        'percent' => '%',
-                                        'fixed' => $currency,
+                                        'percent' => __('create_invoice.discount_types.percent'),
+                                        'fixed' => __('create_invoice.discount_types.fixed', ['currency' => $currency]),
                                     ];
                                 })
                                 ->default('percent')
@@ -369,7 +497,7 @@ class CreateInvoicePage extends Page implements HasForms
                                 ->columnSpan(1),
 
                             TextInput::make('total')
-                                ->label('Ukupno')
+                                ->label(__('create_invoice.fields.invoice_items.total'))
                                 ->numeric()
                                 ->step(0.01)
                                 ->disabled()
@@ -385,10 +513,10 @@ class CreateInvoicePage extends Page implements HasForms
                         ->live(),
 
                     Placeholder::make('invoice_total')
-                        ->label('UKUPNO ZA FAKTURU')
+                        ->label(__('create_invoice.fields.invoice_total'))
                         ->content(function () {
                             $total = 0;
-                            
+
                             if (isset($this->data['invoice_items']) && is_array($this->data['invoice_items'])) {
                                 foreach ($this->data['invoice_items'] as $item) {
                                     if (isset($item['total']) && is_numeric($item['total'])) {
@@ -430,7 +558,7 @@ class CreateInvoicePage extends Page implements HasForms
         $set('total', max(0, round($total, 2)));
     }
 
-    public function create(): void
+    public function createInvoice(string $status): void
     {
         // Validate form data
         $this->form->validate();
@@ -443,30 +571,25 @@ class CreateInvoicePage extends Page implements HasForms
         // Check if client_id is present
         if (!isset($data['client_id']) || empty($data['client_id'])) {
             Notification::make()
-                ->title('Greška')
-                ->body('Morate izabrati klijenta')
+                ->title(__('create_invoice.notifications.error_no_client.title'))
+                ->body(__('create_invoice.notifications.error_no_client.body'))
                 ->danger()
                 ->send();
             return;
         }
         
-        // Calculate total amount from items
-        $totalAmount = 0;
-        if (isset($data['invoice_items'])) {
-            $totalAmount = collect($data['invoice_items'])->sum('total');
-        }
-
         $invoiceData = [
             'user_id' => Auth::id(),
             'client_id' => $data['client_id'],
             'invoice_type' => $data['invoice_type'],
+            'invoice_document_type' => 'faktura',
             'issue_date' => $data['issue_date'],
             'due_date' => $data['due_date'],
             'trading_place' => $data['trading_place'],
             'currency' => $data['currency'],
             'description' => $data['description'],
-            'status' => 'in_preparation',
-            'amount' => $totalAmount,
+            'status' => $status,
+            'amount' => 0, // Will be updated automatically after items are created
         ];
 
         // Add custom invoice number if provided
@@ -492,27 +615,72 @@ class CreateInvoicePage extends Page implements HasForms
                     'amount' => $item['total'],
                 ]);
             }
+            
+            // Update invoice amount after all items are created
+            $invoice->updateAmount();
         }
 
+        // Show different notifications based on action
+        $notificationKey = match($status) {
+            'issued' => 'issued',
+            'sent' => 'sent',
+            default => 'saved'
+        };
+
         Notification::make()
-            ->title('Faktura je uspešno kreirana')
-            ->body("Kreirana faktura broj: {$invoice->invoice_number}")
+            ->title(__("create_invoice.notifications.{$notificationKey}.title"))
+            ->body(__("create_invoice.notifications.{$notificationKey}.body", [
+                'number' => $invoice->invoice_number
+            ]))
             ->success()
             ->send();
 
         $this->redirect('/admin/invoices/'.$invoice->id.'/edit');
     }
+    
+    // Keep the old create method for backward compatibility
+    public function create(): void
+    {
+        $this->createInvoice('in_preparation');
+    }
 
     protected function getFormActions(): array
     {
         return [
-            Action::make('create')
-                ->label('Kreiraj fakturu')
-                ->submit('create')
-                ->keyBindings(['mod+s'])
+            Action::make('save')
+                ->label(__('create_invoice.actions.save'))
+                ->icon('heroicon-o-document')
+                ->color('gray')
+                ->action('saveAsDraft'),
+
+            Action::make('issue')
+                ->label(__('create_invoice.actions.issue'))
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->action('issueInvoice'),
+
+            Action::make('send')
+                ->label(__('create_invoice.actions.issue_and_send'))
+                ->icon('heroicon-o-paper-airplane')
                 ->color('primary')
-            ->extraAttributes(['style' => 'margin-top: 20px']),
+                ->action('issueAndSend')
+                ->keyBindings(['mod+s']),
         ];
+    }
+
+    public function saveAsDraft(): void
+    {
+        $this->createInvoice('in_preparation');
+    }
+
+    public function issueInvoice(): void
+    {
+        $this->createInvoice('issued');
+    }
+
+    public function issueAndSend(): void
+    {
+        $this->createInvoice('sent');
     }
 
     protected function updateDiscountTypeOptions(string $currency): void

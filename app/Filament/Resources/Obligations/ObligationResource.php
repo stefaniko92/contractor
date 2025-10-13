@@ -18,15 +18,21 @@ class ObligationResource extends Resource
 {
     protected static ?string $model = Obligation::class;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Moja kompanija';
-
-    protected static ?string $navigationLabel = 'Zaduženja';
-
     protected static ?string $modelLabel = 'Zaduženje';
 
     protected static ?string $pluralModelLabel = 'Zaduženja';
 
-    protected static ?int $navigationSort = 60;
+    protected static ?int $navigationSort = 17;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return __('navigation.moja_kompanija');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('navigation.menu_items.obligations');
+    }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 

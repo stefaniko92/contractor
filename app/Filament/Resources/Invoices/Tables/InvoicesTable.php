@@ -183,8 +183,38 @@ class InvoicesTable
                         ->label('Kopiraj')
                         ->icon('heroicon-o-document-duplicate')
                         ->color('gray')
-                        ->action(function () {
-                            // TODO: Implement copy functionality
+                        ->action(function ($record) {
+                            // Redirect to invoice creation form with prefilled data
+                            return redirect()->to(
+                                '/admin/create-invoice-page?' . http_build_query([
+                                    'copy_from_invoice' => $record->id,
+                                ])
+                            );
+                        }),
+                    
+                    Action::make('issue')
+                        ->label('Izdaj fakturu')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Izdaj fakturu')
+                        ->modalDescription(function ($record) {
+                            return "Da li želite da izdajete fakturu {$record->invoice_number}? Status će biti promenjen na 'Izdata'.";
+                        })
+                        ->modalSubmitActionLabel('Izdaj')
+                        ->modalIcon('heroicon-o-check-circle')
+                        ->visible(function ($record) {
+                            // Only show issue action for invoices in preparation
+                            return !$record->is_storno && $record->status === 'in_preparation';
+                        })
+                        ->action(function ($record) {
+                            $record->update(['status' => 'issued']);
+                            
+                            Notification::make()
+                                ->title('Faktura izdata')
+                                ->body("Faktura {$record->invoice_number} je uspešno izdata.")
+                                ->success()
+                                ->send();
                         }),
                     
                     Action::make('storno')
@@ -199,8 +229,8 @@ class InvoicesTable
                         ->modalSubmitActionLabel('Storniraj')
                         ->modalIcon('heroicon-o-exclamation-triangle')
                         ->visible(function ($record) {
-                            // Only show storno action for invoices that are not storno invoices themselves and don't already have a storno
-                            return !$record->is_storno && $record->stornoInvoices()->count() === 0;
+                            // Only show storno action for issued invoices that are not storno invoices themselves and don't already have a storno
+                            return !$record->is_storno && $record->status !== 'in_preparation' && $record->stornoInvoices()->count() === 0;
                         })
                         ->action(function ($record) {
                             // Create storno (reversal) invoice with negative amounts

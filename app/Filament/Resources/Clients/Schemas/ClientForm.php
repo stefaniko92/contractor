@@ -41,7 +41,8 @@ class ClientForm
                             ])
                             ->default(1)
                             ->required()
-                            ->live(),
+                            ->live()
+                            ->inline(),
                     ])
                     ->columnSpanFull(),
 
@@ -75,6 +76,19 @@ class ClientForm
                             ->maxLength(255)
                             ->default('Beograd'),
 
+                        Select::make('currency')
+                            ->label('Podrazumevana valuta')
+                            ->options([
+                                'RSD' => 'RSD - Srpski dinar',
+                                'EUR' => 'EUR - Evro',
+                                'USD' => 'USD - Američki dolar',
+                                'GBP' => 'GBP - Britanska funta',
+                                'CHF' => 'CHF - Švajcarski franak',
+                            ])
+                            ->default('RSD')
+                            ->helperText('Ova valuta će biti automatski izabrana pri kreiranju fakture')
+                            ->required(),
+
                         Textarea::make('address')
                             ->label('Adresa')
                             ->rows(3)
@@ -96,23 +110,10 @@ class ClientForm
                         TextInput::make('vat_number')
                             ->label('VAT/EIB broj')
                             ->maxLength(255),
-
-                        Select::make('currency')
-                            ->label('Valuta za fakture')
-                            ->options([
-                                'EUR' => 'EUR - Evro',
-                                'USD' => 'USD - Američki dolar',
-                                'GBP' => 'GBP - Britanska funta',
-                                'CHF' => 'CHF - Švajcarski franak',
-                                'RSD' => 'RSD - Srpski dinar',
-                            ])
-                            ->default('EUR')
-                            ->required(),
                     ])
                     ->columns(2)
                     ->columnSpanFull()
-                    ->visible(fn ($get) => $get('is_domestic') === 0),
-
+                    ->visible(fn ($get) => !$get('is_domestic')),
                 Section::make('Dodatne informacije')
                     ->schema([
                         Textarea::make('notes')

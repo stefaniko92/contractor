@@ -13,12 +13,17 @@ return [
         // Moja kompanija
         'company_info' => 'Podaci o kompaniji',
         'owner_info' => 'Podaci o vlasniku',
+        'bank_accounts' => 'Bankovni računi',
+        'documents' => 'Dokumenta',
+        'kpo_books' => 'KPO knjiga',
         'incomes' => 'Prihodi',
         'obligations' => 'Zaduženja',
 
         // Fakturisanje
         'invoices' => 'Fakture',
         'clients' => 'Klijenti',
+        'profakture' => 'Profakture',
+        'avansi' => 'Avansne fakture',
     ],
 
     'singular' => [

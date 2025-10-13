@@ -24,7 +24,8 @@ class LanguageSwitcher extends Component
     {
         session(['locale' => $locale]);
 
-        return redirect()->to(request()->fullUrlWithQuery(['lang' => $locale]));
+        // Dispatch a browser event to reload the page
+        $this->dispatch('language-changed');
     }
 
     public function render()

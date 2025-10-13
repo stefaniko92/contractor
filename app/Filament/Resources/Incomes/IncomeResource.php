@@ -18,15 +18,21 @@ class IncomeResource extends Resource
 {
     protected static ?string $model = Income::class;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Moja kompanija';
-
-    protected static ?string $navigationLabel = 'Prihodi';
-
     protected static ?string $modelLabel = 'Prihod';
 
     protected static ?string $pluralModelLabel = 'Prihodi';
 
-    protected static ?int $navigationSort = 50;
+    protected static ?int $navigationSort = 16;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return __('navigation.moja_kompanija');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('navigation.menu_items.incomes');
+    }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
