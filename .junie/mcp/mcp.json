@@ -1,0 +1,20 @@
+{
+    "mcpServers": {
+        "laravel-boost": {
+            "command": "/Users/stefanrakic/Library/Application Support/Herd/bin/php83",
+            "args": [
+                "/Users/stefanrakic/Projects/contractor/artisan",
+                "boost:mcp"
+            ]
+        },
+        "herd": {
+            "command": "/Users/stefanrakic/Library/Application Support/Herd/bin/php83",
+            "args": [
+                "/Applications/Herd.app/Contents/Resources/herd-mcp.phar"
+            ],
+            "env": {
+                "SITE_PATH": "/Users/stefanrakic/Projects/contractor"
+            }
+        }
+    }
+}
