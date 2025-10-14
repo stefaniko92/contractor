@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'gotenberg' => [
+        'url' => env('GOTENBERG_URL', 'http://localhost:3000'),
+        'verify_ssl' => env('GOTENBERG_VERIFY_SSL', false), // Set to true in production with valid SSL
+        'api_key' => env('GOTENBERG_API_KEY'), // API key for authentication (Basic Auth)
+    ],
+
 ];

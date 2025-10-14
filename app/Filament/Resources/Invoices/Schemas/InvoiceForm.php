@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Invoices\Schemas;
 
+use App\Models\BankAccount;
 use App\Models\Client;
 use App\Models\UserCompany;
 use Filament\Forms\Components\DatePicker;
@@ -106,6 +107,10 @@ class InvoiceForm
                             ->disabled()
                             ->dehydrated(false),
 
+                        TextInput::make('trading_place')
+                                 ->label('Mesto prometa')
+                                 ->default('Beograd'),
+
                         DatePicker::make('issue_date')
                             ->label('Datum izdavanja')
                             ->required()
@@ -116,10 +121,6 @@ class InvoiceForm
                             ->required()
                             ->default(now()->addDays(30)),
 
-                        TextInput::make('trading_place')
-                            ->label('Mesto prometa')
-                            ->default('Beograd'),
-
                         Select::make('currency')
                             ->label('Valuta')
                             ->options([
@@ -129,7 +130,23 @@ class InvoiceForm
                             ])
                             ->default('RSD')
                             ->required()
-                            ->live(),
+                            ->live()
+                            ->afterStateUpdated(function ($state, $set) {
+                                // Auto-select primary bank account for new currency
+                                $primaryAccount = BankAccount::whereHas('userCompany', function ($query) {
+                                        $query->where('user_id', Auth::id());
+                                    })
+                                    ->where('currency', $state)
+                                    ->where('is_primary', true)
+                                    ->first();
+
+                                if ($primaryAccount) {
+                                    $set('bank_account_id', $primaryAccount->id);
+                                } else {
+                                    // Clear bank account if no matching currency
+                                    $set('bank_account_id', null);
+                                }
+                            }),
 
                         Select::make('status')
                             ->label('Status')
@@ -143,6 +160,44 @@ class InvoiceForm
                             ])
                             ->default('in_preparation')
                             ->required(),
+
+                        Select::make('bank_account_id')
+                              ->label('Bankovni račun')
+                              ->placeholder('Izaberite bankovni račun')
+                              ->options(function ($get, $record) {
+                                  $currency = $get('currency') ?? $record?->currency ?? 'RSD';
+
+                                  return BankAccount::whereHas('userCompany', function ($query) {
+                                      $query->where('user_id', Auth::id());
+                                  })
+                                                    ->where('currency', $currency)
+                                                    ->get()
+                                                    ->mapWithKeys(function ($account) {
+                                                        $label = $account->bank_name . ' - ' . $account->account_number;
+                                                        if ($account->is_primary) {
+                                                            $label .= ' (Podrazumevani)';
+                                                        }
+                                                        return [$account->id => $label];
+                                                    });
+                              })
+                              ->searchable()
+                              ->helperText(fn ($get, $record) => 'Prikazani su samo računi u valuti: ' . ($get('currency') ?? $record?->currency ?? 'RSD'))
+                              ->live()
+                              ->default(function ($record) {
+                                  // If editing and no bank account set, auto-select primary for this currency
+                                  if ($record && !$record->bank_account_id && $record->currency) {
+                                      $primaryAccount = BankAccount::whereHas('userCompany', function ($query) {
+                                          $query->where('user_id', Auth::id());
+                                      })
+                                                                   ->where('currency', $record->currency)
+                                                                   ->where('is_primary', true)
+                                                                   ->first();
+
+                                      return $primaryAccount?->id;
+                                  }
+                                  return null;
+                              })
+                              ->columnSpanFull(),
 
                         Textarea::make('description')
                             ->label('Opis')

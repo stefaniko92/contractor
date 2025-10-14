@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Profakturas\Pages;
 
 use App\Filament\Resources\Profakturas\ProfakturaResource;
+use App\Models\BankAccount;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
@@ -118,6 +119,18 @@ class CustomCreateProfaktura extends Page implements HasForms
                                     $client = Client::find($state);
                                     if ($client && $client->currency) {
                                         $set('currency', $client->currency);
+
+                                        // Auto-select primary bank account for this currency
+                                        $primaryAccount = BankAccount::whereHas('userCompany', function ($query) {
+                                                $query->where('user_id', Auth::id());
+                                            })
+                                            ->where('currency', $client->currency)
+                                            ->where('is_primary', true)
+                                            ->first();
+
+                                        if ($primaryAccount) {
+                                            $set('bank_account_id', $primaryAccount->id);
+                                        }
                                     }
                                 }
                             })
@@ -201,7 +214,48 @@ class CustomCreateProfaktura extends Page implements HasForms
                                 'USD' => 'USD - Američki dolar',
                             ])
                             ->default('RSD')
-                            ->required(),
+                            ->required()
+                            ->live()
+                            ->afterStateUpdated(function ($state, $set) {
+                                // Auto-select primary bank account for new currency
+                                $primaryAccount = BankAccount::whereHas('userCompany', function ($query) {
+                                        $query->where('user_id', Auth::id());
+                                    })
+                                    ->where('currency', $state)
+                                    ->where('is_primary', true)
+                                    ->first();
+
+                                if ($primaryAccount) {
+                                    $set('bank_account_id', $primaryAccount->id);
+                                } else {
+                                    // Clear bank account if no matching currency
+                                    $set('bank_account_id', null);
+                                }
+                            }),
+
+                        Select::make('bank_account_id')
+                            ->label('Bankovni račun')
+                            ->placeholder('Izaberite bankovni račun')
+                            ->options(function ($get) {
+                                $currency = $get('currency') ?? 'RSD';
+
+                                return BankAccount::whereHas('userCompany', function ($query) {
+                                        $query->where('user_id', Auth::id());
+                                    })
+                                    ->where('currency', $currency)
+                                    ->get()
+                                    ->mapWithKeys(function ($account) {
+                                        $label = $account->bank_name . ' - ' . $account->account_number;
+                                        if ($account->is_primary) {
+                                            $label .= ' (Podrazumevani)';
+                                        }
+                                        return [$account->id => $label];
+                                    });
+                            })
+                            ->searchable()
+                            ->helperText(fn ($get) => 'Prikazani su samo računi u valuti: ' . ($get('currency') ?? 'RSD'))
+                            ->live()
+                            ->columnSpanFull(),
 
                         Textarea::make('description')
                             ->label('Opis')
@@ -442,6 +496,7 @@ class CustomCreateProfaktura extends Page implements HasForms
         $invoiceData = [
             'user_id' => Auth::id(),
             'client_id' => $data['client_id'],
+            'bank_account_id' => $data['bank_account_id'] ?? null,
             'invoice_type' => $data['invoice_type'],
             'invoice_document_type' => 'profaktura',
             'issue_date' => $data['issue_date'],

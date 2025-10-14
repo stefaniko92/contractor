@@ -146,17 +146,15 @@ class AvansnaFakturasTable
                         ->label('Štampaj')
                         ->icon('heroicon-o-printer')
                         ->color('gray')
-                        ->action(function () {
-                            // TODO: Implement print functionality
-                        }),
-                    
+                        ->url(fn ($record): string => route('invoices.print', $record))
+                        ->openUrlInNewTab(),
+
                     Action::make('download')
                         ->label('Preuzmi PDF')
                         ->icon('heroicon-o-arrow-down-tray')
                         ->color('gray')
-                        ->action(function () {
-                            // TODO: Implement download functionality
-                        }),
+                        ->url(fn ($record): string => route('invoices.download', $record))
+                        ->openUrlInNewTab(),
                     
                     Action::make('copy')
                         ->label('Kopiraj')

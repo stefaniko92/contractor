@@ -100,12 +100,18 @@ class BankAccounts extends Page implements HasForms
                                 }
                             }),
 
-                        // Foreign bank name (manual input)
+                        // Bank name (auto-filled for domestic, manual for foreign)
                         TextInput::make('bank_name')
                             ->label(__('bank_accounts.fields.bank_name'))
-                            ->required(fn ($get) => $get('account_type') === 'foreign')
-                            ->visible(fn ($get) => $get('account_type') === 'foreign')
-                            ->maxLength(255),
+                            ->required()
+                            ->maxLength(255)
+                            ->disabled(fn ($get) => $get('account_type') === 'domestic')
+                            ->dehydrated()
+                            ->helperText(fn ($get) =>
+                                $get('account_type') === 'domestic'
+                                    ? 'Automatski popunjeno na osnovu izabrane banke'
+                                    : null
+                            ),
 
                         // Account number for domestic
                         TextInput::make('account_number')

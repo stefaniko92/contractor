@@ -11,6 +11,7 @@ class Invoice extends Model
     protected $fillable = [
         'user_id',
         'client_id',
+        'bank_account_id',
         'invoice_number',
         'amount',
         'description',
@@ -44,6 +45,11 @@ class Invoice extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccount::class);
     }
 
     public function incomes(): HasMany

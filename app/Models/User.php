@@ -97,4 +97,5 @@ class User extends Authenticatable
             'id' // Local key on UserCompany table
         );
     }
+
 }
