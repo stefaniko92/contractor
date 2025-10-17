@@ -2,11 +2,14 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\Register;
+use App\Filament\Pages\SubscriptionManagement;
 use App\Http\Middleware\SetLocale;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationGroup;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
@@ -20,6 +23,7 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
@@ -31,6 +35,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            ->registration(Register::class)
             ->colors([
                 'primary' => Color::Blue,
             ])
@@ -64,6 +69,22 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-document-text'),
                 NavigationGroup::make('Moja kompanija')
                     ->icon('heroicon-o-building-office'),
+            ])
+            ->userMenuItems([
+                'subscription' => MenuItem::make()
+                    ->label(function () {
+                        $user = Auth::user();
+                        if ($user->is_grandfathered) {
+                            return 'Pretplata (Grandfather)';
+                        }
+                        if ($user->subscribed('default')) {
+                            return 'Pretplata (Aktivna)';
+                        }
+
+                        return 'Pretplata (Free)';
+                    })
+                    ->url(fn () => SubscriptionManagement::getUrl())
+                    ->icon('heroicon-o-credit-card'),
             ])
             ->sidebarCollapsibleOnDesktop()
             ->renderHook(

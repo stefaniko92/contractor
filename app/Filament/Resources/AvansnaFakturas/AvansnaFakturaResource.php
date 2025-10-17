@@ -9,12 +9,12 @@ use App\Filament\Resources\AvansnaFakturas\Pages\ListAvansnaFakturas;
 use App\Filament\Resources\AvansnaFakturas\Schemas\AvansnaFakturaForm;
 use App\Filament\Resources\AvansnaFakturas\Tables\AvansnaFakturasTable;
 use App\Models\Invoice;
-use Illuminate\Database\Eloquent\Builder;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class AvansnaFakturaResource extends Resource
 {
@@ -40,7 +40,9 @@ class AvansnaFakturaResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->where('invoice_document_type', 'avansna_faktura');
+        return parent::getEloquentQuery()
+            ->where('invoice_document_type', 'avansna_faktura')
+            ->where('user_id', auth()->id());
     }
 
     public static function form(Schema $schema): Schema

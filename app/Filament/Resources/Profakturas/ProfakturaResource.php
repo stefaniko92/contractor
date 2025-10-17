@@ -9,12 +9,12 @@ use App\Filament\Resources\Profakturas\Pages\ListProfakturas;
 use App\Filament\Resources\Profakturas\Schemas\ProfakturaForm;
 use App\Filament\Resources\Profakturas\Tables\ProfakturasTable;
 use App\Models\Invoice;
-use Illuminate\Database\Eloquent\Builder;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class ProfakturaResource extends Resource
 {
@@ -40,7 +40,9 @@ class ProfakturaResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->where('invoice_document_type', 'profaktura');
+        return parent::getEloquentQuery()
+            ->where('invoice_document_type', 'profaktura')
+            ->where('user_id', auth()->id());
     }
 
     public static function form(Schema $schema): Schema

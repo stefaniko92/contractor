@@ -8,11 +8,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Cashier\Billable;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use Billable, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -31,6 +32,8 @@ class User extends Authenticatable
         'logo_path',
         'swift_code',
         'iban',
+        'is_grandfathered',
+        'is_admin',
     ];
 
     /**
@@ -53,7 +56,69 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_grandfathered' => 'boolean',
+            'is_admin' => 'boolean',
         ];
+    }
+
+    /**
+     * Check if user is an admin
+     */
+    public function isAdmin(): bool
+    {
+        return $this->is_admin;
+    }
+
+    /**
+     * Check if user has an active subscription or is grandfathered
+     */
+    public function hasActiveSubscriptionOrGrandfathered(): bool
+    {
+        return $this->is_grandfathered || $this->subscribed('default');
+    }
+
+    /**
+     * Check if user is on free plan
+     */
+    public function isOnFreePlan(): bool
+    {
+        return ! $this->is_grandfathered && ! $this->subscribed('default');
+    }
+
+    /**
+     * Get monthly invoice limit based on subscription
+     */
+    public function getMonthlyInvoiceLimit(): int
+    {
+        if ($this->is_grandfathered) {
+            return PHP_INT_MAX; // Unlimited for grandfathered users
+        }
+
+        if ($this->subscribed('default')) {
+            return PHP_INT_MAX; // Unlimited for paid subscribers
+        }
+
+        return 3; // Free plan limit
+    }
+
+    /**
+     * Get invoices count for current month
+     */
+    public function getMonthlyInvoiceCount(): int
+    {
+        return $this->invoices()
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->where('invoice_document_type', 'faktura')
+            ->count();
+    }
+
+    /**
+     * Check if user can create more invoices this month
+     */
+    public function canCreateInvoice(): bool
+    {
+        return $this->getMonthlyInvoiceCount() < $this->getMonthlyInvoiceLimit();
     }
 
     public function clients(): HasMany
@@ -97,5 +162,4 @@ class User extends Authenticatable
             'id' // Local key on UserCompany table
         );
     }
-
 }

@@ -13,6 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class CompanyOwnerResource extends Resource
 {
@@ -27,6 +28,14 @@ class CompanyOwnerResource extends Resource
     protected static bool $shouldRegisterNavigation = false;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUser;
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->whereHas('userCompany', function ($query) {
+                $query->where('user_id', auth()->id());
+            });
+    }
 
     public static function form(Schema $schema): Schema
     {

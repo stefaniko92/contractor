@@ -54,6 +54,31 @@ class CreateInvoicePage extends Page implements HasForms
 
     public function mount(): void
     {
+        $user = Auth::user();
+
+        // Check if user can create more invoices
+        if (! $user->canCreateInvoice()) {
+            $limit = $user->getMonthlyInvoiceLimit();
+            $current = $user->getMonthlyInvoiceCount();
+
+            Notification::make()
+                ->title('Dostigli ste mesečni limit faktura')
+                ->body("Trenutno ste kreirali {$current} od {$limit} dozvoljenih faktura za ovaj mesec. Nadogradite na Basic plan za neograničen broj faktura.")
+                ->danger()
+                ->persistent()
+                ->actions([
+                    \Filament\Notifications\Actions\Action::make('upgrade')
+                        ->label('Nadogradi na Basic')
+                        ->url('/admin/subscription-management')
+                        ->button(),
+                ])
+                ->send();
+
+            $this->redirect('/admin/invoices');
+
+            return;
+        }
+
         $this->data = [
             'invoice_type' => 'domestic',
             'client_id' => null,
@@ -635,6 +660,18 @@ class CreateInvoicePage extends Page implements HasForms
         $this->form->validate();
 
         $data = $this->data;
+
+        // Check if user can create more invoices
+        $user = Auth::user();
+        if (! $user->canCreateInvoice()) {
+            Notification::make()
+                ->title('Dostigli ste mesečni limit faktura')
+                ->body('Ne možete kreirati više faktura ovog meseca.')
+                ->danger()
+                ->send();
+
+            return;
+        }
 
         // Debug: Log the form data
         \Log::info('Form data:', $data);

@@ -703,6 +703,9 @@ video {
 .text-white{
   color: #fff;
 }
+.fi-section-content-ctn {
+  margin-bottom: 15px;
+}
 
 @page {
   margin: 0;
