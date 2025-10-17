@@ -9,7 +9,6 @@ use App\Models\InvoiceItem;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
-use Filament\Schemas\Components\Group;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -50,7 +49,7 @@ class CreateInvoicePage extends Page implements HasForms
     public ?array $data = [];
 
     public string $invoice_type = 'domestic';
-    
+
     public ?int $client_id = null;
 
     public function mount(): void
@@ -75,7 +74,7 @@ class CreateInvoicePage extends Page implements HasForms
                     'discount_value' => 0,
                     'discount_type' => 'percent',
                     'total' => 0.00,
-                ]
+                ],
             ],
         ];
 
@@ -83,7 +82,7 @@ class CreateInvoicePage extends Page implements HasForms
         if (request()->has('copy_from_invoice')) {
             $invoiceId = request()->get('copy_from_invoice');
             $sourceInvoice = Invoice::with('items', 'client')->find($invoiceId);
-            
+
             if ($sourceInvoice) {
                 $this->data = [
                     'invoice_type' => $sourceInvoice->invoice_type,
@@ -108,11 +107,11 @@ class CreateInvoicePage extends Page implements HasForms
                         ];
                     })->toArray(),
                 ];
-                
+
                 $this->invoice_type = $sourceInvoice->invoice_type;
                 $this->client_id = $sourceInvoice->client_id;
-                
-                $documentTypeLabel = match($sourceInvoice->invoice_document_type) {
+
+                $documentTypeLabel = match ($sourceInvoice->invoice_document_type) {
                     'faktura' => __('create_invoice.document_types.faktura'),
                     'profaktura' => __('create_invoice.document_types.profaktura'),
                     'avansna_faktura' => __('create_invoice.document_types.avansna_faktura'),
@@ -123,18 +122,18 @@ class CreateInvoicePage extends Page implements HasForms
                     ->title(__('create_invoice.notifications.copied_from_invoice.title'))
                     ->body(__('create_invoice.notifications.copied_from_invoice.body', [
                         'type' => $documentTypeLabel,
-                        'number' => $sourceInvoice->invoice_number
+                        'number' => $sourceInvoice->invoice_number,
                     ]))
                     ->success()
                     ->send();
             }
         }
 
-        // Handle copying from profaktura  
+        // Handle copying from profaktura
         if (request()->has('copy_from_profaktura')) {
             $profakturaId = request()->get('copy_from_profaktura');
             $profaktura = Invoice::with('items', 'client')->find($profakturaId);
-            
+
             if ($profaktura && $profaktura->invoice_document_type === 'profaktura') {
                 $this->data = [
                     'invoice_type' => $profaktura->invoice_type,
@@ -144,7 +143,7 @@ class CreateInvoicePage extends Page implements HasForms
                     'due_date' => now()->addDays(30)->format('Y-m-d'),
                     'trading_place' => $profaktura->trading_place,
                     'currency' => $profaktura->currency,
-                    'description' => 'Faktura na osnovu profakture ' . $profaktura->invoice_number . ' od ' . $profaktura->issue_date->format('d.m.Y'),
+                    'description' => 'Faktura na osnovu profakture '.$profaktura->invoice_number.' od '.$profaktura->issue_date->format('d.m.Y'),
                     'status' => 'in_preparation',
                     'invoice_items' => $profaktura->items->map(function ($item) {
                         return [
@@ -159,14 +158,14 @@ class CreateInvoicePage extends Page implements HasForms
                         ];
                     })->toArray(),
                 ];
-                
+
                 $this->invoice_type = $profaktura->invoice_type;
                 $this->client_id = $profaktura->client_id;
-                
+
                 Notification::make()
                     ->title(__('create_invoice.notifications.copied_from_profaktura.title'))
                     ->body(__('create_invoice.notifications.copied_from_profaktura.body', [
-                        'number' => $profaktura->invoice_number
+                        'number' => $profaktura->invoice_number,
                     ]))
                     ->success()
                     ->send();
@@ -223,8 +222,8 @@ class CreateInvoicePage extends Page implements HasForms
 
                                     // Auto-select primary bank account for this currency
                                     $primaryAccount = BankAccount::whereHas('userCompany', function ($query) {
-                                            $query->where('user_id', Auth::id());
-                                        })
+                                        $query->where('user_id', Auth::id());
+                                    })
                                         ->where('currency', $client->currency)
                                         ->where('is_primary', true)
                                         ->first();
@@ -303,22 +302,22 @@ class CreateInvoicePage extends Page implements HasForms
                             $info[] = 'STEFAN RAKIĆ PR RAČUNARSKO PROGRAMIRANJE SR SOFTWARE NIŠ';
                             $info[] = $user->address ?? 'Vojvode Tankosica 11/63';
                             $info[] = 'Niš 18000';
-                            $info[] = 'E-mail: ' . ($user->email ?? 'stefanrakic92@gmail.com');
+                            $info[] = 'E-mail: '.($user->email ?? 'stefanrakic92@gmail.com');
                             $info[] = 'PIB: 109270190';
                             $info[] = 'MB: 64056891';
 
                             // Show SWIFT and IBAN for foreign invoices
                             if (($this->data['invoice_type'] ?? 'domestic') === 'foreign') {
                                 if ($user->swift_code) {
-                                    $info[] = 'SWIFT: ' . $user->swift_code;
+                                    $info[] = 'SWIFT: '.$user->swift_code;
                                 }
                                 if ($user->iban) {
-                                    $info[] = 'IBAN: ' . $user->iban;
+                                    $info[] = 'IBAN: '.$user->iban;
                                 }
                             }
 
-                            return new \Illuminate\Support\HtmlString('<div class="space-y-1">' .
-                                implode('<br>', array_map(fn($line) => '<div>' . e($line) . '</div>', $info)) .
+                            return new \Illuminate\Support\HtmlString('<div class="space-y-1">'.
+                                implode('<br>', array_map(fn ($line) => '<div>'.e($line).'</div>', $info)).
                             '</div>');
                         })
                         ->columnSpan(1),
@@ -328,12 +327,12 @@ class CreateInvoicePage extends Page implements HasForms
                         ->content(function () {
                             $clientId = $this->data['client_id'] ?? null;
 
-                            if (!$clientId) {
+                            if (! $clientId) {
                                 return __('create_invoice.fields.client_info.select_client');
                             }
 
                             $client = Client::find($clientId);
-                            if (!$client) {
+                            if (! $client) {
                                 return __('create_invoice.fields.client_info.not_found');
                             }
 
@@ -344,33 +343,33 @@ class CreateInvoicePage extends Page implements HasForms
                             if ($client->city) {
                                 $city = $client->city;
                                 if ($client->country) {
-                                    $city .= ', ' . $client->country;
+                                    $city .= ', '.$client->country;
                                 }
                                 $info[] = $city;
                             }
 
                             if ($client->email) {
-                                $info[] = 'E-mail: ' . $client->email;
+                                $info[] = 'E-mail: '.$client->email;
                             }
 
                             if ($client->phone) {
-                                $info[] = 'Telefon: ' . $client->phone;
+                                $info[] = 'Telefon: '.$client->phone;
                             }
 
                             if ($client->tax_id) {
-                                $info[] = 'PIB: ' . $client->tax_id;
+                                $info[] = 'PIB: '.$client->tax_id;
                             }
 
                             if ($client->registration_number) {
-                                $info[] = 'MB: ' . $client->registration_number;
+                                $info[] = 'MB: '.$client->registration_number;
                             }
 
                             if ($client->vat_number) {
-                                $info[] = 'VAT/EIB: ' . $client->vat_number;
+                                $info[] = 'VAT/EIB: '.$client->vat_number;
                             }
 
-                            return new \Illuminate\Support\HtmlString('<div class="space-y-1">' .
-                                implode('<br>', array_map(fn($line) => '<div>' . e($line) . '</div>', $info)) .
+                            return new \Illuminate\Support\HtmlString('<div class="space-y-1">'.
+                                implode('<br>', array_map(fn ($line) => '<div>'.e($line).'</div>', $info)).
                             '</div>');
                         })
                         ->columnSpan(1),
@@ -416,8 +415,8 @@ class CreateInvoicePage extends Page implements HasForms
 
                             // Auto-select primary bank account for new currency
                             $primaryAccount = BankAccount::whereHas('userCompany', function ($query) {
-                                    $query->where('user_id', Auth::id());
-                                })
+                                $query->where('user_id', Auth::id());
+                            })
                                 ->where('currency', $state)
                                 ->where('is_primary', true)
                                 ->first();
@@ -437,20 +436,39 @@ class CreateInvoicePage extends Page implements HasForms
                             $currency = $get('currency') ?? 'RSD';
 
                             return BankAccount::whereHas('userCompany', function ($query) {
-                                    $query->where('user_id', Auth::id());
-                                })
+                                $query->where('user_id', Auth::id());
+                            })
                                 ->where('currency', $currency)
                                 ->get()
                                 ->mapWithKeys(function ($account) {
-                                    $label = $account->bank_name . ' - ' . $account->account_number;
+                                    // Use IBAN for foreign accounts, account_number for domestic
+                                    $accountNumber = $account->account_type === 'foreign'
+                                        ? ($account->iban ?? 'N/A')
+                                        : ($account->account_number ?? 'N/A');
+
+                                    $label = $account->bank_name.' - '.$accountNumber;
                                     if ($account->is_primary) {
                                         $label .= ' (Podrazumevani)';
                                     }
+
                                     return [$account->id => $label];
                                 });
                         })
                         ->searchable()
-                        ->helperText(fn ($get) => 'Prikazani su samo računi u valuti: ' . ($get('currency') ?? 'RSD'))
+                        ->helperText(function ($get) {
+                            $currency = $get('currency') ?? 'RSD';
+                            $count = BankAccount::whereHas('userCompany', function ($query) {
+                                $query->where('user_id', Auth::id());
+                            })
+                                ->where('currency', $currency)
+                                ->count();
+
+                            if ($count === 0) {
+                                return "Nemate bankovnih računa u valuti {$currency}. Dodajte račun u sekciji Bankovni računi.";
+                            }
+
+                            return "Prikazani su samo računi u valuti: {$currency}";
+                        })
                         ->live()
                         ->columnSpanFull(),
 
@@ -496,7 +514,7 @@ class CreateInvoicePage extends Page implements HasForms
                                     'l' => __('create_invoice.units.l'),
                                     'pak' => __('create_invoice.units.pak'),
                                     'reč' => __('create_invoice.units.reč'),
-                                    'dan' => __('create_invoice.units.dan')
+                                    'dan' => __('create_invoice.units.dan'),
                                 ]),
 
                             TextInput::make('quantity')
@@ -536,6 +554,7 @@ class CreateInvoicePage extends Page implements HasForms
                                 ->label(__('create_invoice.fields.invoice_items.discount_type'))
                                 ->options(function () {
                                     $currency = $this->data['currency'] ?? 'RSD';
+
                                     return [
                                         'percent' => __('create_invoice.discount_types.percent'),
                                         'fixed' => __('create_invoice.discount_types.fixed', ['currency' => $currency]),
@@ -614,22 +633,23 @@ class CreateInvoicePage extends Page implements HasForms
     {
         // Validate form data
         $this->form->validate();
-        
+
         $data = $this->data;
-        
+
         // Debug: Log the form data
         \Log::info('Form data:', $data);
-        
+
         // Check if client_id is present
-        if (!isset($data['client_id']) || empty($data['client_id'])) {
+        if (! isset($data['client_id']) || empty($data['client_id'])) {
             Notification::make()
                 ->title(__('create_invoice.notifications.error_no_client.title'))
                 ->body(__('create_invoice.notifications.error_no_client.body'))
                 ->danger()
                 ->send();
+
             return;
         }
-        
+
         $invoiceData = [
             'user_id' => Auth::id(),
             'client_id' => $data['client_id'],
@@ -668,13 +688,13 @@ class CreateInvoicePage extends Page implements HasForms
                     'amount' => $item['total'],
                 ]);
             }
-            
+
             // Update invoice amount after all items are created
             $invoice->updateAmount();
         }
 
         // Show different notifications based on action
-        $notificationKey = match($status) {
+        $notificationKey = match ($status) {
             'issued' => 'issued',
             'sent' => 'sent',
             default => 'saved'
@@ -683,14 +703,14 @@ class CreateInvoicePage extends Page implements HasForms
         Notification::make()
             ->title(__("create_invoice.notifications.{$notificationKey}.title"))
             ->body(__("create_invoice.notifications.{$notificationKey}.body", [
-                'number' => $invoice->invoice_number
+                'number' => $invoice->invoice_number,
             ]))
             ->success()
             ->send();
 
         $this->redirect('/admin/invoices/'.$invoice->id.'/edit');
     }
-    
+
     // Keep the old create method for backward compatibility
     public function create(): void
     {
@@ -740,7 +760,7 @@ class CreateInvoicePage extends Page implements HasForms
     {
         // This method is called when currency changes
         // The discount_type options will be automatically updated via the reactive options() function
-        
+
         // Force form to refresh discount type fields
         $this->form->fill($this->data);
     }

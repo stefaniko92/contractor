@@ -28,6 +28,8 @@ class UserCompany extends Model
         'company_email',
         'show_email_on_invoice',
         'company_logo_path',
+        'invoice_note_domestic',
+        'invoice_note_foreign',
     ];
 
     protected $casts = [

@@ -23,6 +23,13 @@ return [
         'company_email' => 'Email',
         'show_email_on_invoice' => 'Show Email on Invoice',
         'company_logo_path' => 'Company Logo',
+        'invoice_note_domestic' => 'Domestic Invoice Note',
+        'invoice_note_foreign' => 'Foreign Invoice Note',
+    ],
+
+    'sections' => [
+        'company_info' => 'Company Information',
+        'invoice_settings' => 'Invoice Settings',
     ],
 
     'actions' => [

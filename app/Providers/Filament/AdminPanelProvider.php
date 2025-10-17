@@ -69,6 +69,17 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::USER_MENU_BEFORE,
                 fn () => view('filament.components.language-switcher')
+            )
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn () => '<style>
+                    .fi-form-actions,
+                    .fi-fo-actions,
+                    form > .fi-section:last-child,
+                    [wire\\:submit] > div:last-child {
+                        margin-top: 15px !important;
+                    }
+                </style>'
             );
     }
 }

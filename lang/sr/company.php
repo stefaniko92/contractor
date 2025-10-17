@@ -23,6 +23,13 @@ return [
         'company_email' => 'Email',
         'show_email_on_invoice' => 'Prikaži email na fakturi',
         'company_logo_path' => 'Logo kompanije',
+        'invoice_note_domestic' => 'Napomena za domaće fakture',
+        'invoice_note_foreign' => 'Napomena za inostrane fakture',
+    ],
+
+    'sections' => [
+        'company_info' => 'Podaci o kompaniji',
+        'invoice_settings' => 'Podešavanja fakture',
     ],
 
     'actions' => [
