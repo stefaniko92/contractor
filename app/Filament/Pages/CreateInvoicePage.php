@@ -510,17 +510,19 @@ class CreateInvoicePage extends Page implements HasForms
                     Repeater::make('invoice_items')
                         ->label(__('create_invoice.fields.invoice_items.label'))
                         ->schema([
-                            Select::make('type')
+                            // Row 1: Type selection with radio buttons
+                            Radio::make('type')
                                 ->label(__('create_invoice.fields.invoice_items.type'))
-                                ->selectablePlaceholder(false)
                                 ->options([
                                     'service' => __('create_invoice.item_types.service'),
                                     'product' => __('create_invoice.item_types.product'),
                                 ])
                                 ->default('service')
-                                ->columnSpan(2)
-                                ->required(),
+                                ->inline()
+                                ->required()
+                                ->columnSpanFull(),
 
+                            // Row 2: All other fields
                             TextInput::make('description')
                                 ->label(__('create_invoice.fields.invoice_items.description'))
                                 ->required()
@@ -540,7 +542,8 @@ class CreateInvoicePage extends Page implements HasForms
                                     'pak' => __('create_invoice.units.pak'),
                                     'reč' => __('create_invoice.units.reč'),
                                     'dan' => __('create_invoice.units.dan'),
-                                ]),
+                                ])
+                                ->columnSpan(2),
 
                             TextInput::make('quantity')
                                 ->label(__('create_invoice.fields.invoice_items.quantity'))
@@ -599,13 +602,12 @@ class CreateInvoicePage extends Page implements HasForms
                                 ->disabled()
                                 ->dehydrated()
                                 ->default(0)
-                                ->columnSpan(1),
+                                ->columnSpan(2),
                         ])
                         ->columns(12)
                         ->columnSpanFull()
                         ->defaultItems(1)
-                        ->collapsible()
-                        ->collapsed(false)
+                        ->addActionLabel('Dodaj stavku')
                         ->live(),
 
                     Placeholder::make('invoice_total')
@@ -761,20 +763,23 @@ class CreateInvoicePage extends Page implements HasForms
                 ->label(__('create_invoice.actions.save'))
                 ->icon('heroicon-o-document')
                 ->color('gray')
-                ->action('saveAsDraft'),
+                ->action('saveAsDraft')
+                ->extraAttributes(['class' => 'mt-6']),
 
             Action::make('issue')
                 ->label(__('create_invoice.actions.issue'))
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
-                ->action('issueInvoice'),
+                ->action('issueInvoice')
+                ->extraAttributes(['class' => 'mt-6']),
 
             Action::make('send')
                 ->label(__('create_invoice.actions.issue_and_send'))
                 ->icon('heroicon-o-paper-airplane')
                 ->color('primary')
                 ->action('issueAndSend')
-                ->keyBindings(['mod+s']),
+                ->keyBindings(['mod+s'])
+                ->extraAttributes(['class' => 'mt-6']),
         ];
     }
 

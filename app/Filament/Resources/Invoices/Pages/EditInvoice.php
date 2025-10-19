@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Invoices\Pages;
 
 use App\Filament\Resources\Invoices\InvoiceResource;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
@@ -29,8 +30,9 @@ class EditInvoice extends EditRecord
                 }
             }
         }
-        
+
         $data['amount'] = $totalAmount;
+
         return $data;
     }
 
@@ -40,5 +42,17 @@ class EditInvoice extends EditRecord
             ->success()
             ->title('Faktura je uspešno ažurirana')
             ->body('Sve izmene su sačuvane.');
+    }
+
+    protected function getSaveFormAction(): Action
+    {
+        return parent::getSaveFormAction()
+            ->label('Sačuvaj');
+    }
+
+    protected function getCancelFormAction(): Action
+    {
+        return parent::getCancelFormAction()
+            ->label('Otkaži');
     }
 }

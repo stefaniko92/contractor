@@ -3,7 +3,9 @@
 namespace App\Filament\Resources\Profakturas\Pages;
 
 use App\Filament\Resources\Profakturas\ProfakturaResource;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 
 class EditProfaktura extends EditRecord
@@ -21,8 +23,9 @@ class EditProfaktura extends EditRecord
                 }
             }
         }
-        
+
         $data['amount'] = $totalAmount;
+
         return $data;
     }
 
@@ -31,5 +34,25 @@ class EditProfaktura extends EditRecord
         return [
             DeleteAction::make(),
         ];
+    }
+
+    protected function getSavedNotification(): ?Notification
+    {
+        return Notification::make()
+            ->success()
+            ->title('Profaktura je uspešno ažurirana')
+            ->body('Sve izmene su sačuvane.');
+    }
+
+    protected function getSaveFormAction(): Action
+    {
+        return parent::getSaveFormAction()
+            ->label('Sačuvaj');
+    }
+
+    protected function getCancelFormAction(): Action
+    {
+        return parent::getCancelFormAction()
+            ->label('Otkaži');
     }
 }

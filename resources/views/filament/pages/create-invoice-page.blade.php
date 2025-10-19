@@ -3,7 +3,7 @@
         <form wire:submit.prevent="create">
             {{ $this->form }}
             
-            <div class="mt-8 flex justify-end space-x-2">
+            <div class="flex justify-end space-x-2" style="margin-top: 2.5rem;">
                 @foreach($this->getFormActions() as $action)
                     {{ $action }}
                 @endforeach

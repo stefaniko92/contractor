@@ -360,20 +360,23 @@ class CustomCreateAvansnaFaktura extends Page implements HasForms
                                 Repeater::make('invoice_items')
                                     ->label('Stavke')
                                     ->schema([
-                                        Select::make('type')
-                                            ->label('Tip')
+                                        // Row 1: Type selection with radio buttons
+                                        Radio::make('type')
+                                            ->label('Tip stavke')
                                             ->options([
                                                 'service' => 'Usluga',
                                                 'product' => 'Proizvod',
                                             ])
                                             ->default('service')
-                                            ->columnSpan(2)
-                                            ->required(),
+                                            ->inline()
+                                            ->required()
+                                            ->columnSpanFull(),
 
+                                        // Row 2: All other fields
                                         TextInput::make('description')
                                             ->label('Naziv')
                                             ->required()
-                                            ->columnSpan(3),
+                                            ->columnSpan(4),
 
                                         Select::make('unit')
                                             ->label('Jedinica')
@@ -388,7 +391,8 @@ class CustomCreateAvansnaFaktura extends Page implements HasForms
                                                 'pak' => 'pak',
                                                 'reč' => 'reč',
                                                 'dan' => 'dan',
-                                            ]),
+                                            ])
+                                            ->columnSpan(1),
 
                                         TextInput::make('quantity')
                                             ->label('Količina')
@@ -447,13 +451,12 @@ class CustomCreateAvansnaFaktura extends Page implements HasForms
                                             ->disabled()
                                             ->dehydrated()
                                             ->default(0)
-                                            ->columnSpan(1),
+                                            ->columnSpan(2),
                                     ])
                                     ->columns(12)
                                     ->columnSpanFull()
                                     ->defaultItems(1)
-                                    ->collapsible()
-                                    ->collapsed(false)
+                                    ->addActionLabel('Dodaj stavku')
                                     ->live(),
 
                                 Placeholder::make('invoice_total')

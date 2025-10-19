@@ -115,7 +115,8 @@ class UsersTable
                     ->query(fn (Builder $query): Builder => $query->where('is_grandfathered', true)),
             ])
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->label('Uredi'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

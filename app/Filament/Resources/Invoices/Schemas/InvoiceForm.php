@@ -7,6 +7,7 @@ use App\Models\Client;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -244,20 +245,23 @@ class InvoiceForm
                                     ->label('Stavke')
                                     ->relationship()
                                     ->schema([
-                                        Select::make('type')
-                                            ->label('Tip')
+                                        // Row 1: Type selection with radio buttons
+                                        Radio::make('type')
+                                            ->label('Tip stavke')
                                             ->options([
                                                 'service' => 'Usluga',
                                                 'product' => 'Proizvod',
                                             ])
                                             ->default('service')
-                                            ->columnSpan(2)
-                                            ->required(),
+                                            ->inline()
+                                            ->required()
+                                            ->columnSpanFull(),
 
+                                        // Row 2: All other fields
                                         TextInput::make('title')
                                             ->label('Naziv')
                                             ->required()
-                                            ->columnSpan(3),
+                                            ->columnSpan(4),
 
                                         Select::make('unit')
                                             ->label('Jedinica')
@@ -328,7 +332,7 @@ class InvoiceForm
                                             ->disabled()
                                             ->dehydrated()
                                             ->default(0)
-                                            ->columnSpan(1),
+                                            ->columnSpan(2),
                                     ])
                                     ->columns(12)
                                     ->columnSpanFull()

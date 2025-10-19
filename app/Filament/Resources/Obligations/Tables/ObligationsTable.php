@@ -42,7 +42,8 @@ class ObligationsTable
                 //
             ])
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->label('Uredi'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
