@@ -2,9 +2,11 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
 use App\Filament\Pages\SubscriptionManagement;
 use App\Http\Middleware\SetLocale;
+use Filament\Actions\Action;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -34,8 +36,20 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+            ->login(Login::class)
             ->registration(Register::class)
+            ->passwordReset()
+            ->brandLogo(function () {
+                $currentRoute = request()->route()?->getName();
+                $authRoutes = ['filament.admin.auth.login', 'filament.admin.auth.register', 'filament.admin.auth.password-reset.request', 'filament.admin.auth.password-reset.reset'];
+
+                if (in_array($currentRoute, $authRoutes)) {
+                    return asset('images/pausalci-logo-transparent.png');
+                }
+
+                return asset('images/pausalci-small.png');
+            })
+            ->brandLogoHeight('2.5rem')
             ->colors([
                 'primary' => Color::Blue,
             ])
@@ -85,6 +99,7 @@ class AdminPanelProvider extends PanelProvider
                     })
                     ->url(fn () => SubscriptionManagement::getUrl())
                     ->icon('heroicon-o-credit-card'),
+                'logout' => fn (Action $action) => $action->label('Odjavi se'),
             ])
             ->sidebarCollapsibleOnDesktop()
             ->renderHook(

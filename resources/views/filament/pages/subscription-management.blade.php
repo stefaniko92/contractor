@@ -65,186 +65,176 @@
 
     {{-- Pricing Plans --}}
     @if($status['status'] !== 'grandfathered')
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-            {{-- Free Plan --}}
-            <div class="h-full">
-            <x-filament::section class="h-full flex flex-col">
-                <x-slot name="heading">
-                    Free Plan
-                </x-slot>
-                <x-slot name="description">
-                    Za početak
-                </x-slot>
+        <x-filament::section>
+            <x-slot name="heading">
+                Dostupni planovi
+            </x-slot>
+            <x-slot name="description">
+                Izaberite plan koji vam najbolje odgovara
+            </x-slot>
 
-                <div class="space-y-6 flex-1 flex flex-col">
-                    <div>
-                        <div class="text-3xl font-bold">0 RSD</div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400">Zauvek besplatno</div>
-                    </div>
+            <div class="fi-sc fi-sc-has-gap fi-grid" style="display: grid; gap: 1.5rem; grid-template-columns: repeat(1, minmax(0, 1fr)); --cols-lg: repeat(3, minmax(0, 1fr));">
+                <style>
+                    @media (min-width: 1024px) {
+                        .fi-grid[style*="--cols-lg"] {
+                            grid-template-columns: var(--cols-lg) !important;
+                        }
+                    }
+                </style>
+                {{-- Free Plan --}}
+                <x-filament::section
+                    icon="heroicon-o-gift"
+                    icon-color="success"
+                    collapsible
+                    :collapsed="false">
+                    <x-slot name="heading">
+                        Free Plan
+                    </x-slot>
+                    <x-slot name="description">
+                        Za početak
+                    </x-slot>
 
-                    <ul class="space-y-2 text-sm flex-1">
-                        @foreach($plans['free']['features'] as $feature)
-                            <li class="flex gap-2">
-                                <span class="text-green-500">✓</span>
-                                <span>{{ $feature }}</span>
-                            </li>
-                        @endforeach
-                    </ul>
+                    @php
+                        $freeFeatures = $plans['free']['features'];
+                        if ($status['status'] === 'free') {
+                            $freeButtonLabel = 'Trenutni plan';
+                            $freeButtonColor = 'gray';
+                            $freeButtonDisabled = true;
+                        } else {
+                            $freeButtonLabel = 'Free plan';
+                            $freeButtonColor = 'gray';
+                            $freeButtonDisabled = true;
+                        }
+                    @endphp
 
-                    <div class="mt-auto">
-                        @if($status['status'] === 'free')
-                            <x-filament::badge color="primary" class="mb-3">
-                                Trenutni plan
-                            </x-filament::badge>
-                        @endif
-                        <x-filament::button
-                            disabled
-                            color="gray"
-                            class="w-full">
-                            {{ $status['status'] === 'free' ? 'Trenutni plan' : 'Free plan' }}
-                        </x-filament::button>
-                    </div>
-                </div>
-            </x-filament::section>
-            </div>
+                    {!! view('filament.components.plan-features', [
+                        'features' => $freeFeatures,
+                        'price' => '0 RSD',
+                        'yearly_price' => 'Zauvek besplatno',
+                        'buttonLabel' => $freeButtonLabel,
+                        'buttonColor' => $freeButtonColor,
+                        'outlined' => false,
+                        'disabled' => $freeButtonDisabled,
+                        'showBadge' => $status['status'] === 'free',
+                        'badgeLabel' => 'Trenutni plan',
+                    ]) !!}
+                </x-filament::section>
 
-            {{-- Basic Monthly --}}
-            <div class="h-full">
-            <x-filament::section class="h-full flex flex-col">
-                <x-slot name="heading">
-                    Basic - Mesečno
-                </x-slot>
-                <x-slot name="description">
-                    Neograničeno fakturisanje
-                </x-slot>
+                {{-- Basic Monthly --}}
+                <x-filament::section
+                    icon="heroicon-o-star"
+                    icon-color="primary"
+                    collapsible
+                    :collapsed="false">
+                    <x-slot name="heading">
+                        Basic - Mesečno
+                    </x-slot>
+                    <x-slot name="description">
+                        Neograničeno fakturisanje
+                    </x-slot>
 
-                <div class="space-y-6 flex-1 flex flex-col">
-                    <div>
-                        <div class="text-3xl font-bold">{{ number_format($plans['basic_monthly']['price']) }} RSD</div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400">Po mesecu</div>
-                    </div>
+                    @php
+                        $isCurrentMonthly = $status['status'] === 'active' && isset($status['billing_cycle']) && str_contains(strtolower($status['billing_cycle']), 'month');
+                        if ($status['status'] === 'free') {
+                            $monthlyButtonLabel = 'Započni besplatno (7 dana)';
+                            $monthlyButtonColor = 'primary';
+                            $monthlyButtonOutlined = false;
+                            $monthlyButtonAction = 'subscribeMonthly';
+                        } elseif ($isCurrentMonthly) {
+                            $monthlyButtonLabel = 'Trenutni plan';
+                            $monthlyButtonColor = 'primary';
+                            $monthlyButtonOutlined = false;
+                            $monthlyButtonAction = null;
+                        } else {
+                            $monthlyButtonLabel = 'Promeni na mesečno';
+                            $monthlyButtonColor = 'primary';
+                            $monthlyButtonOutlined = true;
+                            $monthlyButtonAction = 'subscribeMonthly';
+                        }
+                    @endphp
 
-                    <ul class="space-y-2 text-sm flex-1">
-                        @foreach($plans['basic_monthly']['features'] as $feature)
-                            <li class="flex gap-2">
-                                <span class="text-green-500">✓</span>
-                                <span>{{ $feature }}</span>
-                            </li>
-                        @endforeach
-                    </ul>
+                    {!! view('filament.components.plan-features', [
+                        'features' => $plans['basic_monthly']['features'],
+                        'price' => number_format($plans['basic_monthly']['price']) . ' RSD',
+                        'yearly_price' => 'Po mesecu',
+                        'buttonLabel' => $monthlyButtonLabel,
+                        'buttonColor' => $monthlyButtonColor,
+                        'outlined' => $monthlyButtonOutlined,
+                        'disabled' => $monthlyButtonAction === null,
+                        'wireClick' => $monthlyButtonAction,
+                        'showBadge' => $isCurrentMonthly,
+                        'badgeLabel' => 'Trenutni plan',
+                    ]) !!}
+                </x-filament::section>
 
-                    <div class="mt-auto">
-                        @if($status['status'] === 'active' && isset($status['billing_cycle']) && str_contains(strtolower($status['billing_cycle']), 'month'))
-                            <x-filament::badge color="primary" class="mb-3">
-                                Trenutni plan
-                            </x-filament::badge>
-                        @endif
-
-                        @if($status['status'] === 'free')
-                            <x-filament::button
-                                wire:click="subscribeMonthly"
-                                color="primary"
-                                class="w-full">
-                                Započni besplatno (7 dana)
-                            </x-filament::button>
-                        @elseif($status['status'] === 'active' && isset($status['billing_cycle']) && str_contains(strtolower($status['billing_cycle']), 'month'))
-                            <x-filament::button
-                                disabled
-                                color="primary"
-                                class="w-full">
-                                Trenutni plan
-                            </x-filament::button>
-                        @else
-                            <x-filament::button
-                                wire:click="subscribeMonthly"
-                                outlined
-                                class="w-full">
-                                Promeni na mesečno
-                            </x-filament::button>
-                        @endif
-                    </div>
-                </div>
-            </x-filament::section>
-            </div>
-
-            {{-- Basic Yearly --}}
-            <div class="h-full">
-            <x-filament::section class="h-full flex flex-col">
-                <x-slot name="heading">
-                    Basic - Godišnje
-                </x-slot>
-                <x-slot name="description">
-                    Neograničeno fakturisanje + ušteda
-                </x-slot>
-                <x-slot name="headerEnd">
-                    @if(!($status['status'] === 'active' && isset($status['billing_cycle']) && str_contains(strtolower($status['billing_cycle']), 'year')))
-                        <x-filament::badge color="success">
-                            Preporučeno
-                        </x-filament::badge>
-                    @endif
-                </x-slot>
-
-                <div class="space-y-6 flex-1 flex flex-col">
-                    <div>
-                        <div class="text-3xl font-bold">{{ number_format($plans['basic_yearly']['price']) }} RSD</div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400">Po godini</div>
-                        <div class="mt-2">
+                {{-- Basic Yearly --}}
+                <x-filament::section
+                    icon="heroicon-o-sparkles"
+                    icon-color="warning"
+                    collapsible
+                    :collapsed="false">
+                    <x-slot name="heading">
+                        Basic - Godišnje
+                    </x-slot>
+                    <x-slot name="description">
+                        Neograničeno fakturisanje + ušteda
+                    </x-slot>
+                    @php
+                        $isCurrentYearly = $status['status'] === 'active' && isset($status['billing_cycle']) && str_contains(strtolower($status['billing_cycle']), 'year');
+                    @endphp
+                    @if(!$isCurrentYearly)
+                        <x-slot name="headerEnd">
                             <x-filament::badge color="success">
-                                Ušteda {{ number_format($plans['basic_yearly']['savings']) }} RSD
+                                Preporučeno
                             </x-filament::badge>
-                        </div>
-                    </div>
+                        </x-slot>
+                    @endif
 
-                    <ul class="space-y-2 text-sm flex-1">
-                        @foreach($plans['basic_yearly']['features'] as $feature)
-                            <li class="flex gap-2">
-                                <span class="text-green-500">✓</span>
-                                <span>{{ $feature }}</span>
-                            </li>
-                        @endforeach
-                    </ul>
+                    @php
+                        if ($status['status'] === 'free') {
+                            $yearlyButtonLabel = 'Započni besplatno (7 dana)';
+                            $yearlyButtonColor = 'primary';
+                            $yearlyButtonOutlined = false;
+                            $yearlyButtonAction = 'subscribeYearly';
+                        } elseif ($isCurrentYearly) {
+                            $yearlyButtonLabel = 'Trenutni plan';
+                            $yearlyButtonColor = 'primary';
+                            $yearlyButtonOutlined = false;
+                            $yearlyButtonAction = null;
+                        } else {
+                            $yearlyButtonLabel = 'Promeni na godišnje';
+                            $yearlyButtonColor = 'primary';
+                            $yearlyButtonOutlined = true;
+                            $yearlyButtonAction = 'subscribeYearly';
+                        }
 
-                    <div class="mt-auto">
-                        @if($status['status'] === 'active' && isset($status['billing_cycle']) && str_contains(strtolower($status['billing_cycle']), 'year'))
-                            <x-filament::badge color="primary" class="mb-3">
-                                Trenutni plan
-                            </x-filament::badge>
-                        @endif
+                        $yearlyFeatures = array_merge(
+                            $plans['basic_yearly']['features'],
+                            ['Ušteda od 2 meseca']
+                        );
+                    @endphp
 
-                        @if($status['status'] === 'free')
-                            <x-filament::button
-                                wire:click="subscribeYearly"
-                                color="primary"
-                                class="w-full">
-                                Započni besplatno (7 dana)
-                            </x-filament::button>
-                        @elseif($status['status'] === 'active' && isset($status['billing_cycle']) && str_contains(strtolower($status['billing_cycle']), 'year'))
-                            <x-filament::button
-                                disabled
-                                color="primary"
-                                class="w-full">
-                                Trenutni plan
-                            </x-filament::button>
-                        @else
-                            <x-filament::button
-                                wire:click="subscribeYearly"
-                                outlined
-                                class="w-full">
-                                Promeni na godišnje
-                            </x-filament::button>
-                        @endif
-                    </div>
-                </div>
-            </x-filament::section>
+                    {!! view('filament.components.plan-features', [
+                        'features' => $yearlyFeatures,
+                        'price' => number_format($plans['basic_yearly']['price']) . ' RSD',
+                        'yearly_price' => 'Po godini',
+                        'savingsBadge' => 'Ušteda ' . number_format($plans['basic_yearly']['savings']) . ' RSD',
+                        'buttonLabel' => $yearlyButtonLabel,
+                        'buttonColor' => $yearlyButtonColor,
+                        'outlined' => $yearlyButtonOutlined,
+                        'disabled' => $yearlyButtonAction === null,
+                        'wireClick' => $yearlyButtonAction,
+                        'showBadge' => $isCurrentYearly,
+                        'badgeLabel' => 'Trenutni plan',
+                    ]) !!}
+                </x-filament::section>
             </div>
-        </div>
-    @endif
 
-    {{-- Trust Info --}}
-    @if($status['status'] !== 'grandfathered')
-        <div class="text-center text-sm text-gray-600 dark:text-gray-400">
-            <p>Sigurna naplata preko Stripe • Sve kartice prihvaćene • Otkaži bilo kada</p>
-        </div>
+            {{-- Trust Info --}}
+            <div class="text-center text-sm text-gray-600 dark:text-gray-400 mt-6">
+                <p>Sigurna naplata preko Stripe • Sve kartice prihvaćene • Otkaži bilo kada</p>
+            </div>
+        </x-filament::section>
     @endif
 
     {{-- FAQ --}}

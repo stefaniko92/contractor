@@ -17,8 +17,13 @@ class SetLocale
     {
         $supportedLocales = ['sr', 'en', 'ru'];
 
-        // Prioritet: URL parametar, zatim session
+        // Prioritet: URL parametar, zatim user preference, zatim session
         $locale = $request->get('lang');
+
+        // Check authenticated user's language preference
+        if (! $locale && auth()->check() && auth()->user()->language) {
+            $locale = auth()->user()->language;
+        }
 
         if (! $locale) {
             $locale = session('locale');
