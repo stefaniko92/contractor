@@ -116,6 +116,10 @@ class AdminPanelProvider extends PanelProvider
                         margin-top: 15px !important;
                     }
                 </style>'
+            )
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): string => \Blade::render('<x-exchange-rate-button />')
             );
     }
 }

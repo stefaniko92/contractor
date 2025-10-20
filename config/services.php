@@ -40,5 +40,10 @@ return [
         'verify_ssl' => env('GOTENBERG_VERIFY_SSL', false), // Set to true in production with valid SSL
         'api_key' => env('GOTENBERG_API_KEY'), // API key for authentication (Basic Auth)
     ],
+    'nbs'         => [
+        'username' => env('NBS_USERNAME'),
+        'password' => env('NBS_PASSWORD'),
+        'licence_id' => env('NBS_LICENCE_ID'),
+    ],
 
 ];
