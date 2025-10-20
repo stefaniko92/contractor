@@ -4,21 +4,21 @@ namespace App\Filament\Pages\Auth;
 
 use Filament\Actions\Action;
 use Filament\Auth\Pages\Register as BaseRegister;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
-use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
+use Illuminate\Database\Eloquent\Model;
+use Laravel\Cashier\Subscription;
 
 class Register extends BaseRegister
 {
     protected Width|string|null $maxWidth = Width::SevenExtraLarge;
+
+    public ?string $selectedPlan = 'free';
 
     public function getHeading(): string
     {
@@ -72,25 +72,12 @@ class Register extends BaseRegister
                         ])
                         ->columns(2),
                     Step::make('Izaberite plan')
-                        ->description('Informacije o dostupnim planovima')
+                        ->description('Kliknite na plan koji želite')
                         ->schema([
-                            Radio::make('selected_plan')
-                                ->label('Izaberite plan')
-                                ->options([
-                                    'free' => 'Free Plan - Zauvek besplatno (3 fakture mesečno)',
-                                    'basic_monthly' => 'Basic Plan - Mesečno (600 RSD/mesec, 7 dana besplatno)',
-                                    'basic_yearly' => 'Basic Plan - Godišnje (6000 RSD/godinu, 2 meseca gratis, 7 dana besplatno)',
-                                ])
-                                ->descriptions([
-                                    'free' => 'Savršeno za početak. Bez kreditne kartice.',
-                                    'basic_monthly' => 'Neograničeno faktura, plaćanje mesečno.',
-                                    'basic_yearly' => 'Neograničeno faktura, uštedite 2 meseca.',
-                                ])
-                                ->default('free')
-                                ->required()
-                                ->live()
+                            \Filament\Forms\Components\ViewField::make('plan_cards')
+                                ->view('filament.pages.auth.plan-selection')
+                                ->dehydrated(false)
                                 ->columnSpanFull(),
-                            $this->getSubscriptionInfoSection(),
                         ]),
                 ])
                     ->nextAction(fn ($action) => $action->label('Dalje'))
@@ -140,92 +127,6 @@ class Register extends BaseRegister
             ->dehydrated(false);
     }
 
-    protected function getSubscriptionInfoSection(): Component
-    {
-        return Section::make('Dobrodošli u Pausalci!')
-            ->description('Registracijom dobijate pristup Free planu')
-            ->schema([
-                Grid::make()
-                    ->schema([
-                        Section::make('Free Plan')
-                            ->description('Automatski aktiviran nakon registracije')
-                            ->icon('heroicon-o-gift')
-                            ->iconColor('success')
-                            ->schema([
-                                Placeholder::make('free_features')
-                                    ->hiddenLabel()
-                                    ->content(view('filament.components.plan-features', [
-                                        'features' => [
-                                            '3 fakture mesečno',
-                                            'Osnovna fakturisanja',
-                                            'Evidencija klijenata',
-                                            'PDF izvoz',
-                                        ],
-                                        'buttonLabel' => 'Započni besplatno',
-                                        'buttonColor' => 'success',
-                                        'outlined' => false,
-                                    ])),
-                            ])
-                            ->collapsible()
-                            ->collapsed(false),
-
-                        Section::make('Basic Plan')
-                            ->description('Nadogradite kasnije za neograničene fakture')
-                            ->icon('heroicon-o-star')
-                            ->iconColor('primary')
-                            ->schema([
-                                Placeholder::make('basic_features')
-                                    ->hiddenLabel()
-                                    ->content(view('filament.components.plan-features', [
-                                        'features' => [
-                                            'Neograničen broj faktura',
-                                            'Sva osnovna fakturisanja',
-                                            'Evidencija klijenata',
-                                            'PDF izvoz',
-                                            'Email podrška',
-                                            '7 dana besplatno probnog perioda',
-                                        ],
-                                        'price' => '600 RSD/mesec',
-                                        'yearly_price' => '6000 RSD/godinu (2 meseca gratis)',
-                                        'buttonLabel' => 'Izaberi Basic',
-                                        'buttonColor' => 'primary',
-                                        'outlined' => true,
-                                    ])),
-                            ])
-                            ->collapsible()
-                            ->collapsed(false),
-
-                        Section::make('Premium Plan')
-                            ->description('Sve iz Basic plana + napredne funkcije')
-                            ->icon('heroicon-o-sparkles')
-                            ->iconColor('warning')
-                            ->schema([
-                                Placeholder::make('premium_features')
-                                    ->hiddenLabel()
-                                    ->content(view('filament.components.plan-features', [
-                                        'features' => [
-                                            'Sve iz Basic plana',
-                                            'Automatsko slanje faktura',
-                                            'Prilagođeni PDF šabloni',
-                                            'Napredna analitika',
-                                            'Prioritetna podrška',
-                                            'Multi-valuta podrška',
-                                        ],
-                                        'price' => '1200 RSD/mesec',
-                                        'yearly_price' => '12000 RSD/godinu (2 meseca gratis)',
-                                        'buttonLabel' => 'Izaberi Premium',
-                                        'buttonColor' => 'warning',
-                                        'outlined' => true,
-                                    ])),
-                            ])
-                            ->collapsible()
-                            ->collapsed(false),
-                    ])
-                    ->columns(3),
-            ])
-            ->columnSpanFull();
-    }
-
     protected function getFormActions(): array
     {
         return [];
@@ -236,15 +137,29 @@ class Register extends BaseRegister
         return parent::loginAction()->label('prijavite se na vaš nalog');
     }
 
-    protected function getRedirectUrl(): ?string
+    protected function handleRegistration(array $data): Model
     {
-        $selectedPlan = $this->form->getState()['selected_plan'] ?? 'free';
+        $user = parent::handleRegistration($data);
 
-        if ($selectedPlan !== 'free') {
-            // Store the selected plan in session to handle after login
-            session()->put('selected_plan_after_registration', $selectedPlan);
+        if ($this->selectedPlan === 'free' || ! $this->selectedPlan) {
+            // Create a free "subscription" record for tracking
+            // This won't use Stripe, just a local database record
+            Subscription::create([
+                'user_id' => $user->id,
+                'type' => 'default',
+                'stripe_id' => 'free_plan_'.time(),
+                'stripe_status' => 'active',
+                'stripe_price' => null,
+                'quantity' => 1,
+                'trial_ends_at' => null,
+                'ends_at' => null,
+            ]);
+        } else {
+            // Paid plan selected - store in session and redirect to Stripe
+            session()->put('selected_plan_after_registration', $this->selectedPlan);
+            redirect()->setIntendedUrl(route('filament.admin.pages.subscription-management'));
         }
 
-        return parent::getRedirectUrl();
+        return $user;
     }
 }

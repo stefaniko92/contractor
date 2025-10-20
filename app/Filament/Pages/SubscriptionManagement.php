@@ -184,7 +184,7 @@ class SubscriptionManagement extends Page
         try {
             $checkout = $user
                 ->newSubscription('default', $priceId)
-                ->trialDays(7)
+                // ->trialDays(7) // Temporarily disabled for testing
                 ->checkout([
                     'success_url' => route('filament.admin.pages.subscription-management').'?success=true',
                     'cancel_url' => route('filament.admin.pages.subscription-management').'?canceled=true',
@@ -221,7 +221,7 @@ class SubscriptionManagement extends Page
         try {
             $checkout = $user
                 ->newSubscription('default', $priceId)
-                ->trialDays(7)
+                // ->trialDays(7) // Temporarily disabled for testing
                 ->checkout([
                     'success_url' => route('filament.admin.pages.subscription-management').'?success=true',
                     'cancel_url' => route('filament.admin.pages.subscription-management').'?canceled=true',

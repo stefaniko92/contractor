@@ -9,3 +9,56 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* Plan Selection Card Styles */
+.plan-selection-radio .fi-fo-radio {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.plan-selection-radio .fi-fo-radio-option {
+    border: 2px solid rgb(209 213 219);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    transition: all 0.2s;
+    cursor: pointer;
+    background: white;
+    min-height: 180px;
+}
+
+.plan-selection-radio .fi-fo-radio-option:hover {
+    border-color: rgb(156 163 175);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+.plan-selection-radio .fi-fo-radio-option:has(input:checked) {
+    border-color: rgb(245 158 11);
+    background: rgb(254 252 232);
+    box-shadow: 0 0 0 3px rgb(245 158 11 / 0.1);
+}
+
+.dark .plan-selection-radio .fi-fo-radio-option {
+    background: rgb(17 24 39);
+    border-color: rgb(55 65 81);
+}
+
+.dark .plan-selection-radio .fi-fo-radio-option:hover {
+    border-color: rgb(75 85 99);
+}
+
+.dark .plan-selection-radio .fi-fo-radio-option:has(input:checked) {
+    border-color: rgb(245 158 11);
+    background: rgb(69 26 3);
+}
+
+.plan-selection-radio .fi-fo-radio-option-label {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.plan-selection-radio .fi-fo-radio-option-description {
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
