@@ -64,6 +64,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Determine if the user can access the Filament admin panel
+     */
+    public function canAccessPanel(\Filament\Panel $panel): bool
+    {
+        // Allow all registered users to access the admin panel
+        // This is a multi-tenant app where each user manages their own data
+        return true;
+    }
+
+    /**
      * Check if user is an admin
      */
     public function isAdmin(): bool
