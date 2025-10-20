@@ -43,7 +43,11 @@ class CompanyInfoForm extends Widget implements HasForms
             Toggle::make('show_email_on_invoice')->label(__('company.fields.show_email_on_invoice')),
             TextInput::make('company_foreign_account_number')->label(__('company.fields.company_foreign_account_number')),
             TextInput::make('company_foreign_account_bank')->label(__('company.fields.company_foreign_account_bank')),
-            FileUpload::make('company_logo_path')->label(__('company.fields.company_logo_path'))->image(),
+            FileUpload::make('company_logo_path')
+                ->label(__('company.fields.company_logo_path'))
+                ->image()
+                ->disk('s3')
+                ->visibility('private'),
         ];
     }
 

@@ -106,6 +106,8 @@ class UserCompanyForm
                 FileUpload::make('company_logo_path')
                     ->label('Logo kompanije')
                     ->image()
+                    ->disk('s3')
+                    ->visibility('private')
                     ->directory('company-logos')
                     ->columnSpanFull(),
             ])

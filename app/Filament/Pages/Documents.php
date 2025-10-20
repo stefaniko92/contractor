@@ -12,7 +12,6 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -85,7 +84,10 @@ class Documents extends Page implements HasForms, HasTable
                 Action::make('download')
                     ->label(__('documents.actions.download'))
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->url(fn (Document $record) => Storage::url($record->file_path))
+                    ->url(fn (Document $record) => Storage::disk('s3')->temporaryUrl(
+                        $record->file_path,
+                        now()->addMinutes(5)
+                    ))
                     ->openUrlInNewTab(),
 
                 Action::make('delete')
@@ -96,7 +98,7 @@ class Documents extends Page implements HasForms, HasTable
                     ->modalHeading(__('documents.actions.delete'))
                     ->modalSubmitActionLabel(__('documents.actions.delete'))
                     ->action(function (Document $record) {
-                        Storage::disk('public')->delete($record->file_path);
+                        Storage::disk('s3')->delete($record->file_path);
                         $record->delete();
 
                         Notification::make()
@@ -128,7 +130,8 @@ class Documents extends Page implements HasForms, HasTable
                         FileUpload::make('file')
                             ->label(__('documents.fields.file'))
                             ->required()
-                            ->disk('public')
+                            ->disk('s3')
+                            ->visibility('private')
                             ->directory('documents')
                             ->acceptedFileTypes(['application/pdf', 'image/*', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])
                             ->maxSize(10240) // 10MB
@@ -136,9 +139,8 @@ class Documents extends Page implements HasForms, HasTable
                     ])
                     ->action(function (array $data) {
                         $file = $data['file'];
-                        $filePath = Storage::disk('public')->path($file);
-                        $fileSize = Storage::disk('public')->size($file);
-                        $mimeType = Storage::disk('public')->mimeType($file);
+                        $fileSize = Storage::disk('s3')->size($file);
+                        $mimeType = Storage::disk('s3')->mimeType($file);
                         $fileName = basename($file);
 
                         Document::create([

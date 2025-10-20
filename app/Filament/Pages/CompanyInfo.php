@@ -85,7 +85,11 @@ class CompanyInfo extends Page implements HasForms
                     TextInput::make('company_phone')->label(__('company.fields.company_phone')),
                     TextInput::make('company_email')->label(__('company.fields.company_email'))->email(),
                     Toggle::make('show_email_on_invoice')->label(__('company.fields.show_email_on_invoice')),
-                    FileUpload::make('company_logo_path')->label(__('company.fields.company_logo_path'))->image(),
+                    FileUpload::make('company_logo_path')
+                        ->label(__('company.fields.company_logo_path'))
+                        ->image()
+                        ->disk('s3')
+                        ->visibility('private'),
                 ])
                 ->columns(2),
 
