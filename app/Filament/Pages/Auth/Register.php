@@ -5,6 +5,7 @@ namespace App\Filament\Pages\Auth;
 use Filament\Actions\Action;
 use Filament\Auth\Pages\Register as BaseRegister;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
@@ -73,6 +74,22 @@ class Register extends BaseRegister
                     Step::make('Izaberite plan')
                         ->description('Informacije o dostupnim planovima')
                         ->schema([
+                            Radio::make('selected_plan')
+                                ->label('Izaberite plan')
+                                ->options([
+                                    'free' => 'Free Plan - Zauvek besplatno (3 fakture mesečno)',
+                                    'basic_monthly' => 'Basic Plan - Mesečno (600 RSD/mesec, 7 dana besplatno)',
+                                    'basic_yearly' => 'Basic Plan - Godišnje (6000 RSD/godinu, 2 meseca gratis, 7 dana besplatno)',
+                                ])
+                                ->descriptions([
+                                    'free' => 'Savršeno za početak. Bez kreditne kartice.',
+                                    'basic_monthly' => 'Neograničeno faktura, plaćanje mesečno.',
+                                    'basic_yearly' => 'Neograničeno faktura, uštedite 2 meseca.',
+                                ])
+                                ->default('free')
+                                ->required()
+                                ->live()
+                                ->columnSpanFull(),
                             $this->getSubscriptionInfoSection(),
                         ]),
                 ])
@@ -217,5 +234,17 @@ class Register extends BaseRegister
     public function loginAction(): Action
     {
         return parent::loginAction()->label('prijavite se na vaš nalog');
+    }
+
+    protected function getRedirectUrl(): ?string
+    {
+        $selectedPlan = $this->form->getState()['selected_plan'] ?? 'free';
+
+        if ($selectedPlan !== 'free') {
+            // Store the selected plan in session to handle after login
+            session()->put('selected_plan_after_registration', $selectedPlan);
+        }
+
+        return parent::getRedirectUrl();
     }
 }

@@ -80,7 +80,44 @@ class SubscriptionManagement extends Page
 
     public function mount(): void
     {
-        // Any initialization logic
+        // Handle plan selection from registration
+        if (session()->has('selected_plan_after_registration')) {
+            $selectedPlan = session()->pull('selected_plan_after_registration');
+
+            Notification::make()
+                ->title('Dobrodošli!')
+                ->body('Kliknite na dugme ispod da započnete pretplatu koju ste izabrali.')
+                ->info()
+                ->send();
+
+            // Auto-trigger subscription based on selected plan
+            if ($selectedPlan === 'basic_monthly') {
+                $this->subscribeMonthly();
+
+                return;
+            } elseif ($selectedPlan === 'basic_yearly') {
+                $this->subscribeYearly();
+
+                return;
+            }
+        }
+
+        // Handle Stripe checkout return
+        if (request()->has('success')) {
+            Notification::make()
+                ->title('Hvala vam!')
+                ->body('Vaša pretplata je u toku obrade. Kada Stripe potvrdi plaćanje, vaša pretplata će biti aktivirana.')
+                ->success()
+                ->send();
+        }
+
+        if (request()->has('canceled')) {
+            Notification::make()
+                ->title('Otkazano')
+                ->body('Proces pretplate je otkazan. Možete pokušati ponovo kada budete spremni.')
+                ->warning()
+                ->send();
+        }
     }
 
     /**
