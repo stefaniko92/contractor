@@ -174,4 +174,9 @@ class User extends Authenticatable
             'id' // Local key on UserCompany table
         );
     }
+
+    public function sefEfakturaSettings(): HasMany
+    {
+        return $this->hasMany(SefEfakturaSetting::class);
+    }
 }
