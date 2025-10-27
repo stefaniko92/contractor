@@ -49,7 +49,7 @@ return new class extends Migration
         // Migrate data back (if needed for rollback)
         BankAccount::where('account_type', 'foreign')->each(function ($bankAccount) {
             $userCompany = $bankAccount->userCompany;
-            if ($userCompany && !$userCompany->company_foreign_account_number) {
+            if ($userCompany && ! $userCompany->company_foreign_account_number) {
                 $userCompany->update([
                     'company_foreign_account_number' => $bankAccount->account_number,
                     'company_foreign_account_bank' => $bankAccount->bank_name,

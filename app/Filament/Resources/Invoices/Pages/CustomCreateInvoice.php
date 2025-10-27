@@ -9,15 +9,15 @@ use App\Models\Invoice;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Radio;
-use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Schemas\Schema;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
 
 class CustomCreateInvoice extends Page implements HasForms
@@ -61,7 +61,7 @@ class CustomCreateInvoice extends Page implements HasForms
                     'discount_value' => 0,
                     'discount_type' => 'percent',
                     'total' => 0.00,
-                ]
+                ],
             ],
         ];
 
@@ -69,7 +69,7 @@ class CustomCreateInvoice extends Page implements HasForms
         if (request()->has('copy_from_invoice')) {
             $invoiceId = request()->get('copy_from_invoice');
             $sourceInvoice = Invoice::with('items', 'client')->find($invoiceId);
-            
+
             if ($sourceInvoice) {
                 $this->data = [
                     'invoice_type' => $sourceInvoice->invoice_type,
@@ -94,16 +94,16 @@ class CustomCreateInvoice extends Page implements HasForms
                         ];
                     })->toArray(),
                 ];
-                
+
                 $this->invoice_type = $sourceInvoice->invoice_type;
-                
-                $documentTypeLabel = match($sourceInvoice->invoice_document_type) {
+
+                $documentTypeLabel = match ($sourceInvoice->invoice_document_type) {
                     'faktura' => 'fakture',
                     'profaktura' => 'profakture',
                     'avansna_faktura' => 'avansne fakture',
                     default => 'dokumenta'
                 };
-                
+
                 Notification::make()
                     ->title('Podaci kopirani')
                     ->body("Podaci su uspešno kopirani iz {$documentTypeLabel} {$sourceInvoice->invoice_number}. Možete da ih modifikujete pre kreiranja.")
@@ -112,11 +112,11 @@ class CustomCreateInvoice extends Page implements HasForms
             }
         }
 
-        // Handle copying from profaktura  
+        // Handle copying from profaktura
         if (request()->has('copy_from_profaktura')) {
             $profakturaId = request()->get('copy_from_profaktura');
             $profaktura = Invoice::with('items', 'client')->find($profakturaId);
-            
+
             if ($profaktura && $profaktura->invoice_document_type === 'profaktura') {
                 $this->data = [
                     'invoice_type' => $profaktura->invoice_type,
@@ -126,7 +126,7 @@ class CustomCreateInvoice extends Page implements HasForms
                     'due_date' => now()->addDays(30)->format('Y-m-d'),
                     'trading_place' => $profaktura->trading_place,
                     'currency' => $profaktura->currency,
-                    'description' => 'Faktura na osnovu profakture ' . $profaktura->invoice_number . ' od ' . $profaktura->issue_date->format('d.m.Y'),
+                    'description' => 'Faktura na osnovu profakture '.$profaktura->invoice_number.' od '.$profaktura->issue_date->format('d.m.Y'),
                     'status' => 'issued',
                     'invoice_items' => $profaktura->items->map(function ($item) {
                         return [
@@ -141,9 +141,9 @@ class CustomCreateInvoice extends Page implements HasForms
                         ];
                     })->toArray(),
                 ];
-                
+
                 $this->invoice_type = $profaktura->invoice_type;
-                
+
                 Notification::make()
                     ->title('Podaci kopirani')
                     ->body("Podaci su uspešno kopirani iz profakture {$profaktura->invoice_number}. Možete da ih modifikujete pre kreiranja fakture.")
@@ -151,7 +151,7 @@ class CustomCreateInvoice extends Page implements HasForms
                     ->send();
             }
         }
-        
+
         $this->form->fill($this->data);
     }
 
@@ -211,8 +211,8 @@ class CustomCreateInvoice extends Page implements HasForms
 
                                         // Auto-select primary bank account for this currency
                                         $primaryAccount = BankAccount::whereHas('userCompany', function ($query) {
-                                                $query->where('user_id', Auth::id());
-                                            })
+                                            $query->where('user_id', Auth::id());
+                                        })
                                             ->where('currency', $client->currency)
                                             ->where('is_primary', true)
                                             ->first();
@@ -308,8 +308,8 @@ class CustomCreateInvoice extends Page implements HasForms
                             ->afterStateUpdated(function ($state, $set) {
                                 // Auto-select primary bank account for new currency
                                 $primaryAccount = BankAccount::whereHas('userCompany', function ($query) {
-                                        $query->where('user_id', Auth::id());
-                                    })
+                                    $query->where('user_id', Auth::id());
+                                })
                                     ->where('currency', $state)
                                     ->where('is_primary', true)
                                     ->first();
@@ -329,20 +329,21 @@ class CustomCreateInvoice extends Page implements HasForms
                                 $currency = $get('currency') ?? 'RSD';
 
                                 return BankAccount::whereHas('userCompany', function ($query) {
-                                        $query->where('user_id', Auth::id());
-                                    })
+                                    $query->where('user_id', Auth::id());
+                                })
                                     ->where('currency', $currency)
                                     ->get()
                                     ->mapWithKeys(function ($account) {
-                                        $label = $account->bank_name . ' - ' . $account->account_number;
+                                        $label = $account->bank_name.' - '.$account->account_number;
                                         if ($account->is_primary) {
                                             $label .= ' (Podrazumevani)';
                                         }
+
                                         return [$account->id => $label];
                                     });
                             })
                             ->searchable()
-                            ->helperText(fn ($get) => 'Prikazani su samo računi u valuti: ' . ($get('currency') ?? 'RSD'))
+                            ->helperText(fn ($get) => 'Prikazani su samo računi u valuti: '.($get('currency') ?? 'RSD'))
                             ->live()
                             ->columnSpanFull(),
 

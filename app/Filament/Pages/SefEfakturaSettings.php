@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\SefEfakturaSetting;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -147,7 +148,7 @@ class SefEfakturaSettings extends Page implements HasForms
     protected function getFormActions(): array
     {
         return [
-            \Filament\Actions\Action::make('save')
+            Action::make('save')
                 ->label('Sačuva postavke')
                 ->submit('save')
                 ->color('primary'),

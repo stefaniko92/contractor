@@ -12,13 +12,13 @@ class AvansnaFakturaForm
     {
         // Use the same form as invoices but set the document type to avansna_faktura
         $schema = InvoiceForm::configure($schema);
-        
+
         // Add hidden field to force avansna_faktura type
         $components = $schema->getComponents();
-        array_unshift($components, 
+        array_unshift($components,
             Hidden::make('invoice_document_type')->default('avansna_faktura')
         );
-        
+
         return $schema->components($components);
     }
 }

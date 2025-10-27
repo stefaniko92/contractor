@@ -57,7 +57,7 @@ class InvoicePdfController extends Controller
                 ->pdf();
 
             // Add CSS if exists (must be before html())
-            if (!empty($css)) {
+            if (! empty($css)) {
                 $request = $request->assets(Stream::string('style.css', $css));
             }
 
@@ -74,7 +74,7 @@ class InvoicePdfController extends Controller
             // Add API key authorization if configured
             if ($apiKey = config('services.gotenberg.api_key')) {
                 $httpOptions['headers'] = [
-                    'Authorization' => 'Basic ' . $apiKey,
+                    'Authorization' => 'Basic '.$apiKey,
                 ];
             }
 
@@ -87,7 +87,7 @@ class InvoicePdfController extends Controller
             $pdfContent = $response->getBody()->getContents();
 
             // Determine filename based on document type
-            $documentType = match($invoice->invoice_document_type) {
+            $documentType = match ($invoice->invoice_document_type) {
                 'profaktura' => 'Profaktura',
                 'avansna_faktura' => 'Avansna-Faktura',
                 default => 'Faktura'
@@ -99,7 +99,7 @@ class InvoicePdfController extends Controller
             // Return PDF as download
             return response($pdfContent, 200, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             ]);
 
         } catch (\Exception $e) {
@@ -107,14 +107,14 @@ class InvoicePdfController extends Controller
             \Log::error('Gotenberg PDF generation failed', [
                 'invoice_id' => $invoice->id,
                 'error' => $e->getMessage(),
-                'gotenberg_url' => $gotenbergUrl
+                'gotenberg_url' => $gotenbergUrl,
             ]);
 
             // Return error response
             return response()->json([
                 'error' => 'PDF generation failed',
                 'message' => 'Could not connect to Gotenberg service. Please ensure it is running.',
-                'details' => config('app.debug') ? $e->getMessage() : null
+                'details' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }
@@ -148,7 +148,7 @@ class InvoicePdfController extends Controller
                 ->pdf();
 
             // Add CSS if exists (must be before html())
-            if (!empty($css)) {
+            if (! empty($css)) {
                 $request = $request->assets(Stream::string('style.css', $css));
             }
 
@@ -165,7 +165,7 @@ class InvoicePdfController extends Controller
             // Add API key authorization if configured
             if ($apiKey = config('services.gotenberg.api_key')) {
                 $httpOptions['headers'] = [
-                    'Authorization' => 'Basic ' . $apiKey,
+                    'Authorization' => 'Basic '.$apiKey,
                 ];
             }
 
@@ -177,7 +177,7 @@ class InvoicePdfController extends Controller
             // Extract PDF content from Guzzle response
             $pdfContent = $response->getBody()->getContents();
 
-            $documentType = match($invoice->invoice_document_type) {
+            $documentType = match ($invoice->invoice_document_type) {
                 'profaktura' => 'Profaktura',
                 'avansna_faktura' => 'Avansna-Faktura',
                 default => 'Faktura'
@@ -189,19 +189,19 @@ class InvoicePdfController extends Controller
             // Return PDF for inline display (print)
             return response($pdfContent, 200, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="' . $filename . '"',
+                'Content-Disposition' => 'inline; filename="'.$filename.'"',
             ]);
 
         } catch (\Exception $e) {
             \Log::error('Gotenberg PDF generation failed', [
                 'invoice_id' => $invoice->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
                 'error' => 'PDF generation failed',
                 'message' => 'Could not connect to Gotenberg service.',
-                'details' => config('app.debug') ? $e->getMessage() : null
+                'details' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }

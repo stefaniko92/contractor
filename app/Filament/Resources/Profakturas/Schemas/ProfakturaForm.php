@@ -12,13 +12,13 @@ class ProfakturaForm
     {
         // Use the same form as invoices but set the document type to profaktura
         $schema = InvoiceForm::configure($schema);
-        
+
         // Add hidden field to force profaktura type
         $components = $schema->getComponents();
-        array_unshift($components, 
+        array_unshift($components,
             Hidden::make('invoice_document_type')->default('profaktura')
         );
-        
+
         return $schema->components($components);
     }
 }

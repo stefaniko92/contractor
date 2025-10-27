@@ -52,7 +52,7 @@ class KpoController extends Controller
         $pdf->setOption('enable-local-file-access', true);
 
         // Download the PDF
-        $filename = 'KPO-Knjiga-' . $year . '.pdf';
+        $filename = 'KPO-Knjiga-'.$year.'.pdf';
 
         return $pdf->download($filename);
     }

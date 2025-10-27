@@ -34,6 +34,7 @@ class ClientsTable
                         if (strlen($state) <= 50) {
                             return null;
                         }
+
                         return $state;
                     }),
                 TextColumn::make('city')
@@ -105,6 +106,7 @@ class ClientsTable
                         if (strlen($state) <= 30) {
                             return null;
                         }
+
                         return $state;
                     })
                     ->toggleable(isToggledHiddenByDefault: true),

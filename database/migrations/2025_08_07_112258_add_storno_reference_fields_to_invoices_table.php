@@ -17,7 +17,7 @@ return new class extends Migration
             $table->unsignedBigInteger('original_invoice_id')->nullable()->after('is_storno');
             $table->string('original_invoice_number')->nullable()->after('original_invoice_id');
             $table->date('original_invoice_date')->nullable()->after('original_invoice_number');
-            
+
             // Add foreign key constraint
             $table->foreign('original_invoice_id')->references('id')->on('invoices')->onDelete('set null');
         });
@@ -31,7 +31,7 @@ return new class extends Migration
         Schema::table('invoices', function (Blueprint $table) {
             // Drop foreign key first
             $table->dropForeign(['original_invoice_id']);
-            
+
             // Drop columns
             $table->dropColumn(['is_storno', 'original_invoice_id', 'original_invoice_number', 'original_invoice_date']);
         });

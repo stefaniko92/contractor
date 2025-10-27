@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -16,11 +16,11 @@ return new class extends Migration
         Schema::table('invoices', function (Blueprint $table) {
             $table->string('status', 50)->change();
         });
-        
+
         // Update existing data to map old values to new values
         DB::table('invoices')->where('status', 'paid')->update(['status' => 'charged']);
         DB::table('invoices')->where('status', 'unpaid')->update(['status' => 'uncharged']);
-        
+
         // Now change to the new enum with updated values
         Schema::table('invoices', function (Blueprint $table) {
             $table->enum('status', ['sent', 'issued', 'in_preparation', 'charged', 'uncharged', 'storned'])

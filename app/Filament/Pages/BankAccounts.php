@@ -107,8 +107,7 @@ class BankAccounts extends Page implements HasForms
                             ->maxLength(255)
                             ->disabled(fn ($get) => $get('account_type') === 'domestic')
                             ->dehydrated()
-                            ->helperText(fn ($get) =>
-                                $get('account_type') === 'domestic'
+                            ->helperText(fn ($get) => $get('account_type') === 'domestic'
                                     ? 'Automatski popunjeno na osnovu izabrane banke'
                                     : null
                             ),
@@ -134,8 +133,7 @@ class BankAccounts extends Page implements HasForms
                             ->maxLength(20)
                             ->disabled(fn ($get) => $get('account_type') === 'domestic')
                             ->dehydrated()
-                            ->helperText(fn ($get) =>
-                                $get('account_type') === 'domestic'
+                            ->helperText(fn ($get) => $get('account_type') === 'domestic'
                                     ? __('bank_accounts.help.swift_auto')
                                     : null
                             ),
@@ -147,8 +145,7 @@ class BankAccounts extends Page implements HasForms
                             ->default('RSD')
                             ->disabled(fn ($get) => $get('account_type') === 'domestic')
                             ->dehydrated()
-                            ->helperText(fn ($get) =>
-                                $get('account_type') === 'domestic'
+                            ->helperText(fn ($get) => $get('account_type') === 'domestic'
                                     ? __('bank_accounts.help.domestic_currency')
                                     : null
                             ),
@@ -162,8 +159,7 @@ class BankAccounts extends Page implements HasForms
                     ->addActionLabel(__('bank_accounts.actions.add_account'))
                     ->reorderable()
                     ->collapsible()
-                    ->itemLabel(fn (array $state): ?string =>
-                        $state['bank_name'] ?? __('bank_accounts.new_account')
+                    ->itemLabel(fn (array $state): ?string => $state['bank_name'] ?? __('bank_accounts.new_account')
                     )
                     ->deleteAction(
                         fn ($action) => $action->requiresConfirmation()
@@ -178,11 +174,12 @@ class BankAccounts extends Page implements HasForms
 
         $userCompany = UserCompany::where('user_id', Auth::id())->first();
 
-        if (!$userCompany) {
+        if (! $userCompany) {
             Notification::make()
                 ->title(__('bank_accounts.notifications.company_required'))
                 ->danger()
                 ->send();
+
             return;
         }
 

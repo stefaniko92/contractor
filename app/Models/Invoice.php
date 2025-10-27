@@ -84,7 +84,7 @@ class Invoice extends Model
 
         // Set default prefixes for different document types
         if (empty($prefix)) {
-            $prefix = match($documentType) {
+            $prefix = match ($documentType) {
                 'avansna_faktura' => 'A',
                 'profaktura' => 'P',
                 'faktura' => '',
@@ -93,7 +93,7 @@ class Invoice extends Model
         }
 
         // Create the pattern to match existing numbers for this document type and prefix
-        $pattern = $prefix ? '^' . preg_quote($prefix) . '([0-9]+)/' . $year . '$' : '^[0-9]+/' . $year . '$';
+        $pattern = $prefix ? '^'.preg_quote($prefix).'([0-9]+)/'.$year.'$' : '^[0-9]+/'.$year.'$';
 
         // Find the highest number for this document type, prefix, year and user
         $highestNumber = static::where('user_id', $userId)
@@ -106,6 +106,7 @@ class Invoice extends Model
                 if ($prefix) {
                     // Extract number from "A1/2025" -> 1
                     $parts = explode('/', $number);
+
                     return (int) substr($parts[0], strlen($prefix));
                 } else {
                     // Extract number from "25/2025" -> 25
@@ -114,7 +115,7 @@ class Invoice extends Model
             })
             ->max() ?? 0;
 
-        return $prefix . ($highestNumber + 1) . '/' . $year;
+        return $prefix.($highestNumber + 1).'/'.$year;
     }
 
     public function updateAmount(): void
@@ -123,7 +124,7 @@ class Invoice extends Model
         if ($this->is_storno) {
             return;
         }
-        
+
         $totalAmount = $this->items()->sum('amount');
         $this->updateQuietly(['amount' => $totalAmount]);
     }
@@ -156,7 +157,7 @@ class Invoice extends Model
                     // Otherwise, restore to 'issued'
                     $hasPayments = $originalInvoice->incomes()->count() > 0;
                     $newStatus = $hasPayments ? 'charged' : 'issued';
-                    
+
                     $originalInvoice->update(['status' => $newStatus]);
                 }
             }

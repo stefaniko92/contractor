@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('invoices', function (Blueprint $table) {
             // Drop the old unique constraint on invoice_number only
             $table->dropUnique(['invoice_number']);
-            
+
             // Add new composite unique constraint on invoice_number + invoice_document_type
             $table->unique(['invoice_number', 'invoice_document_type'], 'invoices_number_type_unique');
         });
@@ -28,7 +28,7 @@ return new class extends Migration
         Schema::table('invoices', function (Blueprint $table) {
             // Drop the composite unique constraint
             $table->dropUnique('invoices_number_type_unique');
-            
+
             // Restore the old unique constraint on invoice_number only
             $table->unique('invoice_number');
         });

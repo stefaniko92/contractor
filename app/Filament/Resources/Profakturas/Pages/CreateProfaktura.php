@@ -13,7 +13,7 @@ class CreateProfaktura extends CreateRecord
     {
         // Set document type to profaktura
         $data['invoice_document_type'] = 'profaktura';
-        
+
         // Calculate total amount from invoice items
         $totalAmount = 0;
         if (isset($data['items']) && is_array($data['items'])) {
@@ -23,8 +23,9 @@ class CreateProfaktura extends CreateRecord
                 }
             }
         }
-        
+
         $data['amount'] = $totalAmount;
+
         return $data;
     }
 }

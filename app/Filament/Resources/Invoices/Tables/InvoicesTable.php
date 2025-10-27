@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Invoices\Tables;
 
+use App\Helpers\FilamentHelper;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use Filament\Actions\Action;
@@ -291,6 +292,45 @@ class InvoicesTable
                         })
                         ->action(function () {
                             // TODO: Implement send functionality
+                        }),
+
+                    Action::make('send_to_efaktura')
+                        ->label('eFaktura')
+                        ->icon('heroicon-o-envelope')
+                        ->color('primary')
+                        ->requiresConfirmation()
+                        ->modalHeading('Slanje fakture putem eFaktura sistema')
+                        ->modalDescription('Da li sigurno želiš da pošalješ fakturu putem portala eFaktura?')
+                        ->modalContent(function ($record) {
+                            return view('filament.modals.efaktura-confirmation', [
+                                'invoice' => $record,
+                            ]);
+                        })
+                        ->form([
+                            DatePicker::make('due_date')
+                                ->label('Odaberi datum dospeća fakture:')
+                                ->default(fn ($record) => $record->due_date ?? now()->addDays(30))
+                                ->required()
+                                ->helperText('Datum kada faktura dospećava na naplatu'),
+                        ])
+                        ->modalSubmitActionLabel('Da')
+                        ->modalCancelActionLabel('Ne')
+                        ->modalIcon('heroicon-o-envelope')
+                        ->modalWidth(FilamentHelper::getModalSizeForContext('efaktura_modal'))
+                        ->visible(function ($record) {
+                            // Only show for issued invoices that are not storno invoices
+                            return ! $record->is_storno && $record->status === 'issued';
+                        })
+                        ->action(function (array $data, $record) {
+                            // TODO: Implement SEF sending logic
+                            $dueDate = $data['due_date'];
+
+                            // For now, just show a success notification
+                            Notification::make()
+                                ->title('eFaktura uspešno poslata')
+                                ->body("Faktura {$record->invoice_number} je poslata na eFaktura sistem. Datum dospeća: {$dueDate}.")
+                                ->success()
+                                ->send();
                         }),
 
                     Action::make('enter_payment')

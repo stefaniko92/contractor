@@ -35,7 +35,7 @@ class Bank extends Model
     {
         $bank = self::find($bankId);
 
-        if (!$bank) {
+        if (! $bank) {
             return null;
         }
 

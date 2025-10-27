@@ -50,6 +50,7 @@ class AdminPanelProvider extends PanelProvider
                 return asset('images/pausalci-small.png');
             })
             ->brandLogoHeight('2.5rem')
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->colors([
                 'primary' => Color::Blue,
             ])
@@ -83,6 +84,8 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-document-text'),
                 NavigationGroup::make('Moja kompanija')
                     ->icon('heroicon-o-building-office'),
+                NavigationGroup::make('Testing & Development')
+                    ->icon('heroicon-o-code-bracket'),
             ])
             ->userMenuItems([
                 'subscription' => MenuItem::make()

@@ -13,7 +13,7 @@ class CreateAvansnaFaktura extends CreateRecord
     {
         // Set document type to avansna_faktura
         $data['invoice_document_type'] = 'avansna_faktura';
-        
+
         // Calculate total amount from invoice items
         $totalAmount = 0;
         if (isset($data['items']) && is_array($data['items'])) {
@@ -23,8 +23,9 @@ class CreateAvansnaFaktura extends CreateRecord
                 }
             }
         }
-        
+
         $data['amount'] = $totalAmount;
+
         return $data;
     }
 }
