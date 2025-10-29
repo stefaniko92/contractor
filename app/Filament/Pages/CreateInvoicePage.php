@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Actions\Action as NotificationAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
@@ -67,7 +68,7 @@ class CreateInvoicePage extends Page implements HasForms
                 ->danger()
                 ->persistent()
                 ->actions([
-                    \Filament\Notifications\Actions\Action::make('upgrade')
+                    NotificationAction::make('upgrade')
                         ->label('Nadogradi na Basic')
                         ->url('/admin/subscription-management')
                         ->button(),

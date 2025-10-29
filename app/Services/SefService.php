@@ -5,18 +5,17 @@ namespace App\Services;
 use App\Models\SefEfakturaSetting;
 use App\Services\Sef\Dtos\EfakturaVersionDto;
 use App\Services\Sef\Dtos\MiniCompanyDto;
+use App\Services\Sef\Dtos\MiniInvoiceDto;
 use App\Services\Sef\Dtos\ValueAddedTaxExemptionReasonDto;
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\ConnectException;
-use GuzzleHttp\Exception\RequestException;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Psr\Http\Message\ResponseInterface;
 
 class SefService
 {
-    protected Client $client;
-
     protected ?string $apiKey;
 
     protected string $baseUrl;
@@ -62,18 +61,6 @@ class SefService
         }
 
         $this->apiKey = $this->sefSettings->api_key;
-
-        $this->client = new Client([
-            'base_uri' => $this->baseUrl,
-            'timeout' => $this->timeout,
-            'connect_timeout' => $this->connectTimeout,
-            'verify' => $this->verifySsl,
-            'headers' => [
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-                'User-Agent' => 'Pausalci-SEF-Integration/1.0',
-            ],
-        ]);
     }
 
     /**
@@ -110,11 +97,8 @@ class SefService
     {
         $options = [
             'headers' => $headers,
+            'query' => $params,
         ];
-
-        if (! empty($params)) {
-            $options['query'] = $params;
-        }
 
         if (! empty($data)) {
             $options['json'] = $data;
@@ -135,33 +119,6 @@ class SefService
     }
 
     /**
-     * Upload a file to the SEF API.
-     */
-    protected function upload(string $endpoint, array $files, array $params = [], array $headers = []): array
-    {
-        $multipart = [];
-
-        foreach ($files as $name => $contents) {
-            $multipart[] = [
-                'name' => $name,
-                'contents' => $contents,
-                'filename' => is_string($name) ? $name : 'file',
-            ];
-        }
-
-        $options = [
-            'multipart' => $multipart,
-            'headers' => $headers,
-        ];
-
-        if (! empty($params)) {
-            $options['query'] = $params;
-        }
-
-        return $this->request('POST', $endpoint, $options);
-    }
-
-    /**
      * Make an HTTP request to the SEF API.
      */
     protected function request(string $method, string $endpoint, array $options = []): array
@@ -177,12 +134,16 @@ class SefService
 
         $url = $this->baseUrl.'/'.ltrim($endpoint, '/');
 
-        // Add API key to headers
-        $options['headers']['ApiKey'] = $this->apiKey;
-
         // Generate request ID for tracking
         $requestId = $this->generateRequestId();
-        $options['headers']['X-Request-Id'] = $requestId;
+
+        // Build headers
+        $headers = array_merge($options['headers'] ?? [], [
+            'ApiKey' => $this->apiKey,
+            'X-Request-Id' => $requestId,
+            'Accept' => 'application/json',
+            'User-Agent' => 'Pausalci-SEF-Integration/1.0',
+        ]);
 
         Log::info('SEF API Request', [
             'method' => $method,
@@ -190,27 +151,64 @@ class SefService
             'request_id' => $requestId,
             'user_id' => $this->sefSettings?->user_id,
             'has_api_key' => ! empty($this->apiKey),
+            'content_type' => $headers['Content-Type'] ?? 'not set',
+            'has_body' => isset($options['body']),
+            'body_length' => isset($options['body']) ? strlen($options['body']) : 0,
         ]);
 
         try {
             $startTime = microtime(true);
 
-            $response = $this->client->request($method, $endpoint, $options);
+            // Build HTTP request with Laravel Http
+            $http = Http::timeout($this->timeout)
+                ->connectTimeout($this->connectTimeout);
+
+            if (! $this->verifySsl) {
+                $http = $http->withoutVerifying();
+            }
+
+            // Add headers AFTER withoutVerifying
+            $http = $http->withHeaders($headers);
+
+            // Handle different request types
+            if (strtoupper($method) === 'POST' && isset($options['body'])) {
+                // For POST with raw body (like XML), build URL with query params
+                $fullUrl = $url;
+                if (! empty($options['query'])) {
+                    $fullUrl .= '?'.http_build_query($options['query']);
+                }
+
+                // Use post() with the raw body directly via Guzzle options
+                $response = $http->post($fullUrl, [
+                    'body' => $options['body'],
+                ]);
+            } else {
+                $response = match (strtoupper($method)) {
+                    'GET' => $http->get($url, $options['query'] ?? []),
+                    'POST' => $http->post($url, array_merge($options['json'] ?? [], $options['query'] ?? [])),
+                    'DELETE' => $http->delete($url, $options['json'] ?? []),
+                    default => throw new \Exception("Unsupported HTTP method: $method"),
+                };
+            }
 
             $duration = round((microtime(true) - $startTime) * 1000, 2);
-            $responseBody = $response->getBody()->getContents();
 
             Log::info('SEF API Response', [
-                'status_code' => $response->getStatusCode(),
+                'status_code' => $response->status(),
                 'duration_ms' => $duration,
-                'response_size' => strlen($responseBody),
+                'response_size' => strlen($response->body()),
                 'request_id' => $requestId,
                 'user_id' => $this->sefSettings?->user_id,
             ]);
 
-            return $this->parseResponse($response, $responseBody);
+            // Handle errors
+            if ($response->failed()) {
+                return $this->handleHttpError($response, $requestId);
+            }
 
-        } catch (ConnectException $e) {
+            return $this->parseHttpResponse($response);
+
+        } catch (ConnectionException $e) {
             $error = $this->handleConnectionError($e, $requestId);
             Log::error('SEF API Connection Error', $error);
 
@@ -231,55 +229,65 @@ class SefService
     }
 
     /**
-     * Parse the API response.
+     * Parse the HTTP response from Laravel Http.
      */
-    protected function parseResponse(ResponseInterface $response, string $responseBody): array
+    protected function parseHttpResponse(Response $response): array
     {
-        $statusCode = $response->getStatusCode();
-        $contentType = $response->getHeaderLine('Content-Type');
+        $contentType = $response->header('Content-Type') ?? '';
 
-        // Handle different content types
+        // Handle JSON responses
         if (str_contains($contentType, 'application/json')) {
-            $data = json_decode($responseBody, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \Exception('Invalid JSON response: '.json_last_error_msg());
-            }
-
-            return $data ?? [];
+            return $response->json() ?? [];
         }
 
-        // Handle XML responses (for SEF XML endpoints)
+        // Handle XML responses
         if (str_contains($contentType, 'application/xml') || str_contains($contentType, 'text/xml')) {
-            return ['xml' => $responseBody, 'content_type' => $contentType];
+            return ['xml' => $response->body(), 'content_type' => $contentType];
         }
 
         // Handle binary responses (PDF downloads, etc.)
         if (str_contains($contentType, 'application/octet-stream') ||
             str_contains($contentType, 'application/pdf')) {
-            return ['binary' => $responseBody, 'content_type' => $contentType];
+            return ['binary' => $response->body(), 'content_type' => $contentType];
         }
 
         // Handle plain text responses
         if (str_contains($contentType, 'text/plain')) {
-            return ['text' => $responseBody, 'content_type' => $contentType];
+            return ['text' => $response->body(), 'content_type' => $contentType];
         }
 
         // Fallback: return raw response
-        return ['raw' => $responseBody, 'content_type' => $contentType];
+        return ['raw' => $response->body(), 'content_type' => $contentType];
+    }
+
+    /**
+     * Handle HTTP error responses.
+     */
+    protected function handleHttpError(Response $response, string $requestId): array
+    {
+        $statusCode = $response->status();
+        $responseBody = $response->body();
+
+        return [
+            'error' => "SEF API request failed with status {$statusCode}: {$responseBody}",
+            'type' => 'http_error',
+            'status_code' => $statusCode,
+            'response_body' => $responseBody,
+            'request_id' => $requestId,
+        ];
     }
 
     /**
      * Handle connection errors.
      */
-    protected function handleConnectionError(ConnectException $e, string $requestId): array
+    protected function handleConnectionError(ConnectionException $e, string $requestId): array
     {
         $message = $e->getMessage();
 
         return [
-            'error_type' => 'ConnectException',
+            'error_type' => 'ConnectionException',
             'message' => 'SEF API connection failed: '.$message,
             'request_id' => $requestId,
-            'curl_error' => $this->extractCurlError($message),
             'suggestions' => [
                 'Check if the SEF service is accessible',
                 'Verify network connectivity',
@@ -294,9 +302,9 @@ class SefService
      */
     protected function handleRequestError(RequestException $e, string $requestId): array
     {
-        $response = $e->getResponse();
-        $statusCode = $response ? $response->getStatusCode() : 0;
-        $responseBody = $response ? $response->getBody()->getContents() : 'No response body';
+        $response = $e->response;
+        $statusCode = $response ? $response->status() : 0;
+        $responseBody = $response ? $response->body() : 'No response body';
 
         return [
             'error_type' => 'RequestException',
@@ -328,42 +336,6 @@ class SefService
     protected function generateRequestId(): string
     {
         return uniqid('sef_', true);
-    }
-
-    /**
-     * Extract cURL error details from error message.
-     */
-    protected function extractCurlError(string $message): array
-    {
-        $curlInfo = [];
-
-        // Extract cURL error number
-        if (preg_match('/cURL error (\d+):/', $message, $matches)) {
-            $curlInfo['error_code'] = (int) $matches[1];
-            $curlInfo['error_description'] = $this->getCurlErrorDescription($curlInfo['error_code']);
-        }
-
-        return $curlInfo;
-    }
-
-    /**
-     * Get human-readable description for common cURL error codes.
-     */
-    protected function getCurlErrorDescription(int $errorCode): string
-    {
-        $descriptions = [
-            6 => 'Could not resolve host (DNS lookup failed)',
-            7 => 'Failed to connect to host',
-            28 => 'Operation timeout',
-            35 => 'SSL connect error',
-            51 => 'SSL peer certificate verification failed',
-            52 => 'Got nothing from server',
-            56 => 'Connection reset by peer',
-            60 => 'SSL certificate has expired',
-            61 => 'SSL certificate is not yet valid',
-        ];
-
-        return $descriptions[$errorCode] ?? 'Unknown cURL error';
     }
 
     /**
@@ -618,6 +590,30 @@ class SefService
     }
 
     /**
+     * Search for a company by PIB in SEF system.
+     * Returns array with companies key for consistency with verification command.
+     */
+    public function searchCompanyByPib(string $pib): array
+    {
+        $result = $this->checkCompanyExistsByPib($pib);
+
+        if (isset($result['error'])) {
+            return $result;
+        }
+
+        // Return in format expected by verification command
+        if ($result['exists']) {
+            return [
+                'companies' => [$result['company']],
+            ];
+        }
+
+        return [
+            'companies' => [],
+        ];
+    }
+
+    /**
      * Check if a company exists in SEF system by name.
      */
     public function checkCompanyExistsByName(string $companyName): array
@@ -695,5 +691,120 @@ class SefService
             'total_count' => count($filteredCompanies),
             'criteria' => $criteria,
         ];
+    }
+
+    /**
+     * 7. Send invoice UBL XML to SEF eFaktura system.
+     * This uploads the invoice UBL XML to the SEF system.
+     */
+    public function sendInvoiceUbl(string $xmlContent, array $params = []): array
+    {
+        // Build endpoint with query parameters
+        $endpoint = 'publicApi/sales-invoice/ubl';
+
+        // Send XML directly as application/xml
+        $options = [
+            'headers' => [
+                'Content-Type' => 'application/xml',
+            ],
+            'body' => $xmlContent,
+        ];
+
+        if (! empty($params)) {
+            $options['query'] = $params;
+        }
+
+        $response = $this->request('POST', $endpoint, $options);
+
+        // Log full response for debugging
+        Log::info('eFaktura send response details', [
+            'response' => $response,
+            'has_error' => isset($response['error']),
+            'sales_invoice_id' => $response['SalesInvoiceId'] ?? null,
+        ]);
+
+        if (isset($response['error'])) {
+            return $response;
+        }
+
+        return $response;
+    }
+
+    /**
+     * Send invoice to eFaktura by uploading UBL XML content.
+     * This is the main method to send invoices to the SEF system.
+     */
+    public function sendInvoice(string $xmlContent, ?string $sendToCir = null, ?string $requestId = null): array
+    {
+        $params = [];
+
+        if ($sendToCir !== null) {
+            $params['sendToCir'] = $sendToCir;
+        }
+
+        if ($requestId !== null) {
+            $params['requestId'] = $requestId;
+        }
+
+        // executeValidation can be added if needed
+        $params['executeValidation'] = true;
+
+        return $this->sendInvoiceUbl($xmlContent, $params);
+    }
+
+    /**
+     * Get list of sent invoices from SEF system.
+     */
+    public function getSentInvoices(array $filters = []): array
+    {
+        $response = $this->get('publicApi/sales-invoice/sent', $filters);
+
+        if (isset($response['error'])) {
+            return $response;
+        }
+
+        // Convert to DTOs if we have data
+        if (is_array($response)) {
+            $invoices = [];
+            foreach ($response as $invoiceData) {
+                $invoices[] = MiniInvoiceDto::fromArray($invoiceData);
+            }
+
+            return ['invoices' => $invoices];
+        }
+
+        return $response;
+    }
+
+    /**
+     * Get invoice status from SEF system by SEF invoice ID.
+     */
+    public function getInvoiceStatus(string $sefInvoiceId): array
+    {
+        $response = $this->get('publicApi/sales-invoice', [
+            'invoiceId' => $sefInvoiceId,
+        ]);
+
+        if (isset($response['error'])) {
+            return $response;
+        }
+
+        return $response;
+    }
+
+    /**
+     * Cancel an invoice in the SEF system.
+     */
+    public function cancelInvoice(string $sefInvoiceId, string $reason = ''): array
+    {
+        $response = $this->delete("publicApi/sales-invoice/{$sefInvoiceId}", [
+            'reason' => $reason,
+        ]);
+
+        if (isset($response['error'])) {
+            return $response;
+        }
+
+        return $response;
     }
 }

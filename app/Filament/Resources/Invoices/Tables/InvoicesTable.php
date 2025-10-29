@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Invoices\Tables;
 use App\Helpers\FilamentHelper;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Services\SefService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -15,6 +16,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Log;
 
 class InvoicesTable
 {
@@ -76,6 +78,38 @@ class InvoicesTable
                         'uncharged' => 'Nenaplaćena',
                         'storned' => 'Stornirana',
                         default => $state,
+                    }),
+
+                TextColumn::make('efakturaInvoice.status')
+                    ->label('eFaktura Status')
+                    ->badge()
+                    ->color(fn (?string $state): string => match ($state) {
+                        'sent' => 'info',
+                        'delivered' => 'primary',
+                        'accepted' => 'success',
+                        'rejected' => 'danger',
+                        'cancelled' => 'warning',
+                        'failed' => 'danger',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        'sent' => 'Poslato',
+                        'delivered' => 'Dostavljeno',
+                        'accepted' => 'Prihvaćeno',
+                        'rejected' => 'Odbijeno',
+                        'cancelled' => 'Otkazano',
+                        'failed' => 'Neuspelo',
+                        null => 'Nije poslato',
+                        default => $state,
+                    })
+                    ->default('Nije poslato')
+                    ->tooltip(function ($record) {
+                        if ($record->efakturaInvoice) {
+                            $sent = $record->efakturaInvoice->sent_at?->format('d.m.Y H:i');
+                            $updated = $record->efakturaInvoice->updated_at?->format('d.m.Y H:i');
+                            return "Poslato: {$sent}\nAžurirano: {$updated}";
+                        }
+                        return null;
                     }),
 
                 // Additional toggleable columns (hidden by default)
@@ -311,26 +345,245 @@ class InvoicesTable
                                 ->label('Odaberi datum dospeća fakture:')
                                 ->default(fn ($record) => $record->due_date ?? now()->addDays(30))
                                 ->required()
+                                ->native(false)
                                 ->helperText('Datum kada faktura dospećava na naplatu'),
                         ])
+                        ->fillForm(function ($record) {
+                            return [
+                                'due_date' => $record->due_date ?? now()->addDays(30),
+                            ];
+                        })
                         ->modalSubmitActionLabel('Da')
                         ->modalCancelActionLabel('Ne')
                         ->modalIcon('heroicon-o-envelope')
                         ->modalWidth(FilamentHelper::getModalSizeForContext('efaktura_modal'))
                         ->visible(function ($record) {
-                            // Only show for issued invoices that are not storno invoices
-                            return ! $record->is_storno && $record->status === 'issued';
+                            // Only show if not sent to eFaktura yet and not a storno invoice
+                            return ! $record->is_storno && $record->efakturaInvoice === null;
                         })
                         ->action(function (array $data, $record) {
-                            // TODO: Implement SEF sending logic
-                            $dueDate = $data['due_date'];
+                            $dueDate = $data['due_date'] ?? now()->addDays(30);
 
-                            // For now, just show a success notification
-                            Notification::make()
-                                ->title('eFaktura uspešno poslata')
-                                ->body("Faktura {$record->invoice_number} je poslata na eFaktura sistem. Datum dospeća: {$dueDate}.")
-                                ->success()
-                                ->send();
+                            // Update the due date if it was changed
+                            if ($dueDate !== $record->due_date) {
+                                $record->update(['due_date' => $dueDate]);
+                            }
+
+                            // Initialize SEF service for the authenticated user
+                            $sefService = SefService::forAuthenticatedUser();
+
+                            // Check if SEF is configured and available
+                            $availabilityStatus = $sefService->getAvailabilityStatus();
+
+                            if (! $availabilityStatus['available']) {
+                                Notification::make()
+                                    ->title('SEF nije dostupan')
+                                    ->body($availabilityStatus['message'])
+                                    ->warning()
+                                    ->send();
+
+                                Log::warning('SEF not available for invoice sending', [
+                                    'invoice_id' => $record->id,
+                                    'invoice_number' => $record->invoice_number,
+                                    'availability_status' => $availabilityStatus,
+                                ]);
+
+                                return;
+                            }
+
+                            // Check if client is verified in eFaktura system
+                            if (! $record->client->efaktura_verified) {
+                                Notification::make()
+                                    ->title('Klijent nije verifikovan')
+                                    ->body('Klijent još nije proverен u eFaktura sistemu. Molimo sačekajte automatsku verifikaciju ili pokrenite komandu ručno.')
+                                    ->warning()
+                                    ->send();
+
+                                Log::warning('Client not verified in eFaktura', [
+                                    'invoice_id' => $record->id,
+                                    'invoice_number' => $record->invoice_number,
+                                    'client_id' => $record->client_id,
+                                    'client_name' => $record->client->name,
+                                ]);
+
+                                return;
+                            }
+
+                            if ($record->client->efaktura_status !== 'active') {
+                                Notification::make()
+                                    ->title('Klijent nije pronađen u eFaktura')
+                                    ->body('Ovaj klijent ne postoji u eFaktura sistemu. Ne možete poslati fakturu elektronski.')
+                                    ->danger()
+                                    ->send();
+
+                                Log::warning('Client not found in eFaktura', [
+                                    'invoice_id' => $record->id,
+                                    'invoice_number' => $record->invoice_number,
+                                    'client_id' => $record->client_id,
+                                    'client_name' => $record->client->name,
+                                    'efaktura_status' => $record->client->efaktura_status,
+                                    'verification_error' => $record->client->efaktura_verification_error,
+                                ]);
+
+                                return;
+                            }
+
+                            // Generate UBL XML from invoice
+                            try {
+                                Log::info('eFaktura send action triggered', [
+                                    'invoice_id' => $record->id,
+                                    'invoice_number' => $record->invoice_number,
+                                    'due_date' => is_string($dueDate) ? $dueDate : $dueDate->format('Y-m-d'),
+                                    'sef_configured' => true,
+                                ]);
+
+                                $xmlContent = $record->generateUblXml();
+
+                                Log::info('UBL XML generated successfully', [
+                                    'invoice_id' => $record->id,
+                                    'xml_length' => strlen($xmlContent),
+                                ]);
+
+                                $response = $sefService->sendInvoice($xmlContent, 'SendToCir');
+
+                                if (isset($response['error'])) {
+                                    // Store failed attempt
+                                    \App\Models\EfakturaInvoice::create([
+                                        'invoice_id' => $record->id,
+                                        'user_id' => $record->user_id,
+                                        'status' => 'failed',
+                                        'last_error' => $response['error'],
+                                        'last_error_at' => now(),
+                                        'sef_response' => $response,
+                                    ]);
+
+                                    Notification::make()
+                                        ->title('Greška pri slanju fakture')
+                                        ->body($response['error'])
+                                        ->danger()
+                                        ->send();
+
+                                    Log::error('Failed to send invoice to eFaktura', [
+                                        'invoice_id' => $record->id,
+                                        'invoice_number' => $record->invoice_number,
+                                        'error' => $response,
+                                    ]);
+
+                                    return;
+                                }
+
+                                // Store successful send in efaktura_invoices table
+                                $efakturaInvoice = \App\Models\EfakturaInvoice::create([
+                                    'invoice_id' => $record->id,
+                                    'user_id' => $record->user_id,
+                                    'sef_invoice_id' => $response['SalesInvoiceId'] ?? $response['InvoiceId'] ?? $response['invoiceId'] ?? $response['id'] ?? null,
+                                    'sef_invoice_number' => $response['InvoiceNumber'] ?? $response['invoiceNumber'] ?? null,
+                                    'sef_request_id' => $response['RequestId'] ?? $response['requestId'] ?? null,
+                                    'status' => 'sent',
+                                    'sent_at' => now(),
+                                    'sef_response' => $response,
+                                    'status_history' => [
+                                        [
+                                            'from' => 'draft',
+                                            'to' => 'sent',
+                                            'changed_at' => now()->toISOString(),
+                                            'data' => $response,
+                                        ],
+                                    ],
+                                ]);
+
+                                Notification::make()
+                                    ->title('eFaktura uspešno poslata')
+                                    ->body("Faktura {$record->invoice_number} je uspešno poslata na eFaktura sistem. Datum dospeća: ".(is_string($dueDate) ? $dueDate : $dueDate->format('d.m.Y')).'.')
+                                    ->success()
+                                    ->send();
+
+                                Log::info('Invoice sent to eFaktura successfully', [
+                                    'invoice_id' => $record->id,
+                                    'invoice_number' => $record->invoice_number,
+                                    'efaktura_invoice_id' => $efakturaInvoice->id,
+                                    'sef_response' => $response,
+                                ]);
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->title('Greška pri generisanju ili slanju fakture')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+
+                                Log::error('Exception during invoice sending', [
+                                    'invoice_id' => $record->id,
+                                    'invoice_number' => $record->invoice_number,
+                                    'exception' => $e->getMessage(),
+                                    'trace' => $e->getTraceAsString(),
+                                ]);
+                            }
+                        }),
+
+                    Action::make('refresh_efaktura_status')
+                        ->label('Osvježi eFaktura status')
+                        ->icon('heroicon-o-arrow-path')
+                        ->color('info')
+                        ->visible(function ($record) {
+                            // Only show if invoice has been sent to eFaktura
+                            return $record->efakturaInvoice !== null;
+                        })
+                        ->requiresConfirmation()
+                        ->modalHeading('Osvježi status fakture na eFaktura sistemu')
+                        ->modalDescription('Da li želiš da proveriš trenutni status ove fakture na eFaktura portalu?')
+                        ->modalSubmitActionLabel('Osvježi')
+                        ->action(function ($record) {
+                            $efakturaInvoice = $record->efakturaInvoice;
+
+                            if (! $efakturaInvoice) {
+                                Notification::make()
+                                    ->title('Greška')
+                                    ->body('Ova faktura nije poslata na eFaktura sistem.')
+                                    ->warning()
+                                    ->send();
+
+                                return;
+                            }
+
+                            try {
+                                $response = $efakturaInvoice->refreshStatus();
+
+                                if (isset($response['error'])) {
+                                    Notification::make()
+                                        ->title('Greška pri osvježavanju statusa')
+                                        ->body($response['error'])
+                                        ->danger()
+                                        ->send();
+
+                                    return;
+                                }
+
+                                Notification::make()
+                                    ->title('Status osvježen')
+                                    ->body("Trenutni status fakture na eFaktura sistemu: {$efakturaInvoice->status}")
+                                    ->success()
+                                    ->send();
+
+                                Log::info('eFaktura status refreshed', [
+                                    'invoice_id' => $record->id,
+                                    'efaktura_invoice_id' => $efakturaInvoice->id,
+                                    'status' => $efakturaInvoice->status,
+                                    'response' => $response,
+                                ]);
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->title('Greška pri osvježavanju statusa')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+
+                                Log::error('Exception during status refresh', [
+                                    'invoice_id' => $record->id,
+                                    'efaktura_invoice_id' => $efakturaInvoice->id,
+                                    'exception' => $e->getMessage(),
+                                    'trace' => $e->getTraceAsString(),
+                                ]);
+                            }
                         }),
 
                     Action::make('enter_payment')

@@ -78,6 +78,24 @@ class Invoice extends Model
         return $this->hasMany(Invoice::class, 'original_invoice_id');
     }
 
+    /**
+     * Get the eFaktura invoice record for this invoice
+     */
+    public function efakturaInvoice(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(EfakturaInvoice::class);
+    }
+
+    /**
+     * Generate UBL XML for this invoice to send to eFaktura
+     */
+    public function generateUblXml(): string
+    {
+        $generator = new \App\Services\UblXmlGenerator;
+
+        return $generator->generate($this);
+    }
+
     public static function generateInvoiceNumber(int $userId, ?int $year = null, string $documentType = 'faktura', string $prefix = ''): string
     {
         $year = $year ?? now()->year;

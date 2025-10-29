@@ -10,3 +10,9 @@ Artisan::command('inspire', function () {
 
 // Schedule exchange rate sync to run daily at midnight
 Schedule::command('app:sync-exchanges-rates')->daily();
+
+// Schedule eFaktura client verification to run daily at 2 AM
+Schedule::command('efaktura:verify-clients --limit=100')
+    ->dailyAt('02:00')
+    ->withoutOverlapping()
+    ->runInBackground();
