@@ -6,8 +6,10 @@ use App\Models\BankAccount;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Services\PibLookupService;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Actions\Action as FormAction;
 use Filament\Actions\Action as NotificationAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
@@ -21,6 +23,8 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\Facades\Auth;
 
 class CreateInvoicePage extends Page implements HasForms
@@ -261,15 +265,68 @@ class CreateInvoicePage extends Page implements HasForms
                             }
                         })
                         ->createOptionForm([
+                            TextInput::make('tax_id')
+                                ->label(__('create_invoice.client_form.tax_id'))
+                                ->required()
+                                ->live(onBlur: true)
+                                ->suffixAction(
+                                    FormAction::make('fetch_by_pib')
+                                        ->label('Pretraži')
+                                        ->icon('heroicon-o-magnifying-glass')
+                                        ->visible(fn () => $this->invoice_type === 'domestic')
+                                        ->action(function (Set $set, Get $get) {
+                                            $pib = $get('tax_id');
+
+                                            if (empty($pib)) {
+                                                Notification::make()
+                                                    ->title('PIB je obavezan')
+                                                    ->body('Molimo unesite PIB pre preuzimanja podataka.')
+                                                    ->warning()
+                                                    ->send();
+
+                                                return;
+                                            }
+
+                                            $pibLookupService = new PibLookupService;
+                                            $result = $pibLookupService->fetchByPib($pib);
+
+                                            if (! $result['success']) {
+                                                Notification::make()
+                                                    ->title('Greška pri preuzimanju podataka')
+                                                    ->body($result['error'] ?? 'Podaci nisu pronađeni.')
+                                                    ->danger()
+                                                    ->send();
+
+                                                return;
+                                            }
+
+                                            // Transform and fill the form
+                                            $clientData = $pibLookupService->transformToClientData($result);
+
+                                            foreach ($clientData as $field => $value) {
+                                                if ($value !== null && $field !== 'is_domestic' && $field !== 'client_type') {
+                                                    $set($field, $value);
+                                                }
+                                            }
+
+                                            Notification::make()
+                                                ->title('Podaci uspešno preuzeti')
+                                                ->body('Informacije o kompaniji su automatski popunjene.')
+                                                ->success()
+                                                ->send();
+                                        })
+                                ),
+
                             TextInput::make('company_name')
                                 ->label(__('create_invoice.client_form.company_name'))
                                 ->required(),
-                            TextInput::make('tax_id')
-                                ->label(__('create_invoice.client_form.tax_id'))
-                                ->required(),
+                            TextInput::make('registration_number')
+                                ->label(__('create_invoice.client_form.registration_number'))
+                                ->visible(fn () => $this->invoice_type === 'domestic'),
                             TextInput::make('address')
                                 ->label(__('create_invoice.client_form.address'))
-                                ->required(),
+                                ->required()
+                                ->columnSpanFull(),
                             TextInput::make('city')
                                 ->label(__('create_invoice.client_form.city'))
                                 ->visible(fn () => $this->invoice_type === 'foreign'),
@@ -278,9 +335,6 @@ class CreateInvoicePage extends Page implements HasForms
                                 ->visible(fn () => $this->invoice_type === 'foreign'),
                             TextInput::make('vat_number')
                                 ->label(__('create_invoice.client_form.vat_number'))
-                                ->visible(fn () => $this->invoice_type === 'foreign'),
-                            TextInput::make('registration_number')
-                                ->label(__('create_invoice.client_form.registration_number'))
                                 ->visible(fn () => $this->invoice_type === 'foreign'),
                             Select::make('currency')
                                 ->label('Podrazumevana valuta')
@@ -299,6 +353,9 @@ class CreateInvoicePage extends Page implements HasForms
                             TextInput::make('phone')
                                 ->label(__('create_invoice.client_form.phone')),
                         ])
+                        ->createOptionModalHeading('Dodaj novog klijenta')
+                        ->createOptionModalSubmitActionLabel('Kreiraj klijenta')
+                        ->createOptionModalCancelActionLabel('Otkaži')
                         ->createOptionUsing(function (array $data, $set) {
                             $data['user_id'] = Auth::id();
                             $data['is_domestic'] = $this->invoice_type === 'domestic';
@@ -532,6 +589,8 @@ class CreateInvoicePage extends Page implements HasForms
                             Select::make('unit')
                                 ->label(__('create_invoice.fields.invoice_items.unit'))
                                 ->selectablePlaceholder(false)
+                                ->default('kom')
+                                ->required()
                                 ->options([
                                     'kom' => __('create_invoice.units.kom'),
                                     'sat' => __('create_invoice.units.sat'),

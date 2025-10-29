@@ -3,6 +3,8 @@
 namespace App\Filament\Pages;
 
 use App\Models\UserCompany;
+use App\Services\PibLookupService;
+use Filament\Actions\Action as FormAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Textarea;
@@ -13,6 +15,8 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\Facades\Auth;
 
 class CompanyInfo extends Page implements HasForms
@@ -69,9 +73,83 @@ class CompanyInfo extends Page implements HasForms
         return [
             Section::make(__('company.sections.company_info'))
                 ->schema([
+                    TextInput::make('company_tax_id')
+                        ->label(__('company.fields.company_tax_id'))
+                        ->live(onBlur: true)
+                        ->suffixAction(
+                            FormAction::make('fetch_by_pib')
+                                ->label('Preuzmi')
+                                ->icon('heroicon-o-magnifying-glass')
+                                ->action(function (Set $set, Get $get) {
+                                    $pib = $get('company_tax_id');
+
+                                    if (empty($pib)) {
+                                        Notification::make()
+                                            ->title('PIB je obavezan')
+                                            ->body('Molimo unesite PIB pre preuzimanja podataka.')
+                                            ->warning()
+                                            ->send();
+
+                                        return;
+                                    }
+
+                                    $pibLookupService = new PibLookupService;
+                                    $result = $pibLookupService->fetchByPib($pib);
+
+                                    if (! $result['success']) {
+                                        Notification::make()
+                                            ->title('Greška pri preuzimanju podataka')
+                                            ->body($result['error'] ?? 'Podaci nisu pronađeni.')
+                                            ->danger()
+                                            ->send();
+
+                                        return;
+                                    }
+
+                                    $data = $result['data'];
+
+                                    // Map the fetched data to company fields
+                                    $set('company_name', $data['naziv'] ?? null);
+                                    $set('company_full_name', $data['naziv'] ?? null);
+                                    $set('company_registry_number', $data['mbr'] ?? null);
+                                    $set('company_address', $data['adresa'] ?? null);
+                                    $set('company_status', $data['status'] ?? null);
+
+                                    // Extract city from mesto field
+                                    if (! empty($data['mesto'])) {
+                                        $mesto = $data['mesto'];
+                                        if (preg_match('/^([^\(]+)/', $mesto, $matches)) {
+                                            $set('company_city', trim($matches[1]));
+                                        } else {
+                                            $set('company_city', $mesto);
+                                        }
+                                    }
+
+                                    // Extract municipality
+                                    if (! empty($data['opstina'])) {
+                                        $set('company_municipality', $data['opstina']);
+                                    }
+
+                                    // Parse registration date
+                                    if (! empty($data['pocetak'])) {
+                                        try {
+                                            $date = \Carbon\Carbon::createFromFormat('d.m.Y.', $data['pocetak']);
+                                            $set('company_registration_date', $date->format('Y-m-d'));
+                                        } catch (\Exception $e) {
+                                            // Ignore if date parsing fails
+                                        }
+                                    }
+
+                                    Notification::make()
+                                        ->title('Podaci uspešno preuzeti')
+                                        ->body('Informacije o kompaniji su automatski popunjene.')
+                                        ->success()
+                                        ->send();
+                                })
+                        ),
+
                     TextInput::make('company_name')->label(__('company.fields.company_name'))->required(),
                     TextInput::make('company_full_name')->label(__('company.fields.company_full_name')),
-                    TextInput::make('company_tax_id')->label(__('company.fields.company_tax_id')),
                     TextInput::make('company_registry_number')->label(__('company.fields.company_registry_number')),
                     TextInput::make('company_activity_code')->label(__('company.fields.company_activity_code')),
                     Textarea::make('company_activity_desc')->label(__('company.fields.company_activity_desc')),

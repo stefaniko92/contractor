@@ -140,9 +140,12 @@ class ProfakturasTable
                 //
             ])
             ->recordActions([
-                EditAction::make()
-                    ->label('Uredi')
-                    ->icon('heroicon-o-pencil'),
+                Action::make('print')
+                    ->label('Štampaj')
+                    ->icon('heroicon-o-printer')
+                    ->color('gray')
+                    ->url(fn ($record): string => route('invoices.print', $record))
+                    ->openUrlInNewTab(),
 
                 Action::make('create_invoice')
                     ->label('Kreiraj fakturu')
@@ -169,12 +172,9 @@ class ProfakturasTable
                     }),
 
                 ActionGroup::make([
-                    Action::make('print')
-                        ->label('Štampaj')
-                        ->icon('heroicon-o-printer')
-                        ->color('gray')
-                        ->url(fn ($record): string => route('invoices.print', $record))
-                        ->openUrlInNewTab(),
+                    EditAction::make()
+                        ->label('Uredi')
+                        ->icon('heroicon-o-pencil'),
 
                     Action::make('download')
                         ->label('Preuzmi PDF')
@@ -191,90 +191,27 @@ class ProfakturasTable
                             // TODO: Implement copy functionality
                         }),
 
-                    Action::make('issue')
-                        ->label('Izdaj profakturu')
-                        ->icon('heroicon-o-check-circle')
-                        ->color('success')
+                    Action::make('create_avans_invoice')
+                        ->label('Kreiraj avansnu fakturu')
+                        ->icon('heroicon-o-document-text')
+                        ->color('info')
                         ->requiresConfirmation()
-                        ->modalHeading('Izdaj profakturu')
+                        ->modalHeading('Kreiraj avansnu fakturu od profakture')
                         ->modalDescription(function ($record) {
-                            return "Da li želite da izdajete profakturu {$record->invoice_number}? Status će biti promenjen na 'Izdata'.";
+                            return "Da li želite da kreirate avansnu fakturu na osnovu profakture {$record->invoice_number}? Svi podaci će biti kopirani u novu avansnu fakturu.";
                         })
-                        ->modalSubmitActionLabel('Izdaj')
-                        ->modalIcon('heroicon-o-check-circle')
+                        ->modalSubmitActionLabel('Kreiraj avansnu fakturu')
+                        ->modalIcon('heroicon-o-document-text')
                         ->visible(function ($record) {
-                            // Only show issue action for profakturas in preparation
-                            return ! $record->is_storno && $record->status === 'in_preparation';
+                            // Only show for non-storno profakturas
+                            return ! $record->is_storno;
                         })
                         ->action(function ($record) {
-                            $record->update(['status' => 'issued']);
-
+                            // TODO: Implement avans invoice creation
                             Notification::make()
-                                ->title('Profaktura izdata')
-                                ->body("Profaktura {$record->invoice_number} je uspešno izdata.")
-                                ->success()
-                                ->send();
-                        }),
-
-                    Action::make('storno')
-                        ->label('Storniraj')
-                        ->icon('heroicon-o-x-mark')
-                        ->color('warning')
-                        ->requiresConfirmation()
-                        ->modalHeading('Storniraj profakturu')
-                        ->modalDescription(function ($record) {
-                            return "Da li ste sigurni da želite da stornirate profakturu {$record->invoice_number}? Biće kreirana nova storno profaktura sa negativnim iznosima u skladu sa srpskim zakonskim propisima. Obe profakture će biti zabeležene u knjizi prihoda.";
-                        })
-                        ->modalSubmitActionLabel('Storniraj')
-                        ->modalIcon('heroicon-o-exclamation-triangle')
-                        ->visible(function ($record) {
-                            // Only show storno action for issued profakturas that are not storno invoices themselves and don't already have a storno
-                            return ! $record->is_storno && $record->status !== 'in_preparation' && $record->stornoInvoices()->count() === 0;
-                        })
-                        ->action(function ($record) {
-                            // Create storno (reversal) profaktura with negative amounts
-                            $stornoInvoice = Invoice::create([
-                                'user_id' => $record->user_id,
-                                'client_id' => $record->client_id,
-                                'invoice_type' => $record->invoice_type,
-                                'invoice_document_type' => $record->invoice_document_type,
-                                'issue_date' => now(),
-                                'due_date' => now()->addDays(30),
-                                'trading_place' => $record->trading_place,
-                                'currency' => $record->currency,
-                                'description' => 'Storno profakture '.$record->invoice_number.' od '.$record->issue_date->format('d.m.Y'),
-                                'status' => 'storned',
-                                'amount' => -$record->amount, // Negative amount
-                                'is_storno' => true,
-                                'original_invoice_id' => $record->id,
-                                'original_invoice_number' => $record->invoice_number,
-                                'original_invoice_date' => $record->issue_date,
-                            ]);
-
-                            // Create negative invoice items
-                            foreach ($record->items as $item) {
-                                InvoiceItem::create([
-                                    'invoice_id' => $stornoInvoice->id,
-                                    'title' => $item->title,
-                                    'description' => 'Storno: '.$item->description,
-                                    'type' => $item->type,
-                                    'unit' => $item->unit,
-                                    'quantity' => $item->quantity,
-                                    'unit_price' => -$item->unit_price, // Negative unit price
-                                    'discount_value' => $item->discount_value,
-                                    'discount_type' => $item->discount_type,
-                                    'amount' => -$item->amount, // Negative amount
-                                    'currency' => $item->currency,
-                                ]);
-                            }
-
-                            // Update original profaktura status to charged (since stornoing implies it was paid)
-                            $record->update(['status' => 'charged']);
-
-                            Notification::make()
-                                ->title('Storno profaktura kreirana')
-                                ->body("Kreirana je storno profaktura {$stornoInvoice->invoice_number} za originalnu profakturu {$record->invoice_number}. Obe profakture su zabeležene u knjizi prihoda u skladu sa zakonskim propisima.")
-                                ->success()
+                                ->title('Funkcija u izradi')
+                                ->body('Kreiranje avansne fakture će uskoro biti dostupno.')
+                                ->warning()
                                 ->send();
                         }),
 
@@ -284,50 +221,6 @@ class ProfakturasTable
                         ->color('info')
                         ->action(function () {
                             // TODO: Implement send functionality
-                        }),
-
-                    Action::make('enter_payment')
-                        ->label('Unesi plaćanje')
-                        ->icon('heroicon-o-currency-dollar')
-                        ->color('success')
-                        ->form([
-                            DatePicker::make('payment_date')
-                                ->label('Datum plaćanja')
-                                ->default(now())
-                                ->required(),
-                            TextInput::make('payment_amount')
-                                ->label('Iznos plaćanja')
-                                ->numeric()
-                                ->step(0.01)
-                                ->required()
-                                ->helperText(function ($record) {
-                                    return 'Ukupan iznos profakture: '.number_format($record->amount, 2).' '.$record->currency;
-                                }),
-                        ])
-                        ->fillForm(function ($record) {
-                            return [
-                                'payment_date' => now(),
-                                'payment_amount' => $record->amount,
-                            ];
-                        })
-                        ->action(function (array $data, $record) {
-                            // Update invoice status based on payment amount
-                            $paymentAmount = (float) $data['payment_amount'];
-                            $invoiceAmount = (float) $record->amount;
-
-                            if ($paymentAmount >= $invoiceAmount) {
-                                $record->update(['status' => 'charged']);
-                                $statusMessage = 'Status profakture promenjen na "Naplaćena"';
-                            } else {
-                                $record->update(['status' => 'uncharged']);
-                                $statusMessage = 'Status profakture promenjen na "Nenaplaćena" (delimično plaćanje)';
-                            }
-
-                            Notification::make()
-                                ->title('Plaćanje zabeleženo')
-                                ->body('Plaćanje od '.number_format($paymentAmount, 2).' '.$record->currency." je uspešno zabeleženo za profakturu {$record->invoice_number}. ".$statusMessage)
-                                ->success()
-                                ->send();
                         }),
 
                     Action::make('delete')

@@ -2,12 +2,17 @@
 
 namespace App\Filament\Resources\Clients\Schemas;
 
+use App\Services\PibLookupService;
+use Filament\Actions\Action as FormAction;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
 
@@ -57,7 +62,54 @@ class ClientForm
 
                                 TextInput::make('tax_id')
                                     ->label('PIB')
-                                    ->maxLength(255),
+                                    ->maxLength(255)
+                                    ->live(onBlur: true),
+
+                                FormAction::make('fetch_by_pib')
+                                    ->label('Pretraži po PIB-u')
+                                    ->icon('heroicon-o-magnifying-glass')
+                                    ->color('primary')
+                                    ->action(function (Set $set, Get $get) {
+                                        $pib = $get('tax_id');
+
+                                        if (empty($pib)) {
+                                            Notification::make()
+                                                ->title('PIB je obavezan')
+                                                ->body('Molimo unesite PIB pre preuzimanja podataka.')
+                                                ->warning()
+                                                ->send();
+
+                                            return;
+                                        }
+
+                                        $pibLookupService = new PibLookupService;
+                                        $result = $pibLookupService->fetchByPib($pib);
+
+                                        if (! $result['success']) {
+                                            Notification::make()
+                                                ->title('Greška pri preuzimanju podataka')
+                                                ->body($result['error'] ?? 'Podaci nisu pronađeni.')
+                                                ->danger()
+                                                ->send();
+
+                                            return;
+                                        }
+
+                                        // Transform and fill the form
+                                        $clientData = $pibLookupService->transformToClientData($result);
+
+                                        foreach ($clientData as $field => $value) {
+                                            if ($value !== null) {
+                                                $set($field, $value);
+                                            }
+                                        }
+
+                                        Notification::make()
+                                            ->title('Podaci uspešno preuzeti')
+                                            ->body('Informacije o kompaniji su automatski popunjene.')
+                                            ->success()
+                                            ->send();
+                                    }),
 
                                 TextInput::make('registration_number')
                                     ->label('Matični broj')

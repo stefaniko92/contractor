@@ -140,17 +140,35 @@ class AvansnaFakturasTable
                 //
             ])
             ->recordActions([
-                EditAction::make()
-                    ->label('Uredi')
-                    ->icon('heroicon-o-pencil'),
+                Action::make('print')
+                    ->label('Štampaj')
+                    ->icon('heroicon-o-printer')
+                    ->color('gray')
+                    ->url(fn ($record): string => route('invoices.print', $record))
+                    ->openUrlInNewTab(),
+
+                Action::make('delete')
+                    ->label('Obriši')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Obriši avansnu fakturu')
+                    ->modalDescription('Da li ste sigurni da želite da obrišete ovu avansnu fakturu? Ova akcija se ne može poništiti.')
+                    ->modalSubmitActionLabel('Obriši')
+                    ->action(function ($record) {
+                        $record->delete();
+
+                        Notification::make()
+                            ->title('Avansna faktura obrisana')
+                            ->body("Avansna faktura broj {$record->invoice_number} je uspešno obrisana.")
+                            ->success()
+                            ->send();
+                    }),
 
                 ActionGroup::make([
-                    Action::make('print')
-                        ->label('Štampaj')
-                        ->icon('heroicon-o-printer')
-                        ->color('gray')
-                        ->url(fn ($record): string => route('invoices.print', $record))
-                        ->openUrlInNewTab(),
+                    EditAction::make()
+                        ->label('Uredi')
+                        ->icon('heroicon-o-pencil'),
 
                     Action::make('download')
                         ->label('Preuzmi PDF')
@@ -165,31 +183,6 @@ class AvansnaFakturasTable
                         ->color('gray')
                         ->action(function () {
                             // TODO: Implement copy functionality
-                        }),
-
-                    Action::make('issue')
-                        ->label('Izdaj fakturu')
-                        ->icon('heroicon-o-check-circle')
-                        ->color('success')
-                        ->requiresConfirmation()
-                        ->modalHeading('Izdaj avansnu fakturu')
-                        ->modalDescription(function ($record) {
-                            return "Da li želite da izdajete avansnu fakturu {$record->invoice_number}? Status će biti promenjen na 'Izdata'.";
-                        })
-                        ->modalSubmitActionLabel('Izdaj')
-                        ->modalIcon('heroicon-o-check-circle')
-                        ->visible(function ($record) {
-                            // Only show issue action for avansna fakturas in preparation
-                            return ! $record->is_storno && $record->status === 'in_preparation';
-                        })
-                        ->action(function ($record) {
-                            $record->update(['status' => 'issued']);
-
-                            Notification::make()
-                                ->title('Avansna faktura izdata')
-                                ->body("Avansna faktura {$record->invoice_number} je uspešno izdata.")
-                                ->success()
-                                ->send();
                         }),
 
                     Action::make('storno')
@@ -260,68 +253,6 @@ class AvansnaFakturasTable
                         ->color('info')
                         ->action(function () {
                             // TODO: Implement send functionality
-                        }),
-
-                    Action::make('enter_payment')
-                        ->label('Unesi plaćanje')
-                        ->icon('heroicon-o-currency-dollar')
-                        ->color('success')
-                        ->form([
-                            DatePicker::make('payment_date')
-                                ->label('Datum plaćanja')
-                                ->default(now())
-                                ->required(),
-                            TextInput::make('payment_amount')
-                                ->label('Iznos plaćanja')
-                                ->numeric()
-                                ->step(0.01)
-                                ->required()
-                                ->helperText(function ($record) {
-                                    return 'Ukupan iznos avansne fakture: '.number_format($record->amount, 2).' '.$record->currency;
-                                }),
-                        ])
-                        ->fillForm(function ($record) {
-                            return [
-                                'payment_date' => now(),
-                                'payment_amount' => $record->amount,
-                            ];
-                        })
-                        ->action(function (array $data, $record) {
-                            // Update invoice status based on payment amount
-                            $paymentAmount = (float) $data['payment_amount'];
-                            $invoiceAmount = (float) $record->amount;
-
-                            if ($paymentAmount >= $invoiceAmount) {
-                                $record->update(['status' => 'charged']);
-                                $statusMessage = 'Status avansne fakture promenjen na "Naplaćena"';
-                            } else {
-                                $record->update(['status' => 'uncharged']);
-                                $statusMessage = 'Status avansne fakture promenjen na "Nenaplaćena" (delimično plaćanje)';
-                            }
-
-                            Notification::make()
-                                ->title('Plaćanje zabeleženo')
-                                ->body('Plaćanje od '.number_format($paymentAmount, 2).' '.$record->currency." je uspešno zabeleženo za avansnu fakturu {$record->invoice_number}. ".$statusMessage)
-                                ->success()
-                                ->send();
-                        }),
-
-                    Action::make('delete')
-                        ->label('Obriši')
-                        ->icon('heroicon-o-trash')
-                        ->color('danger')
-                        ->requiresConfirmation()
-                        ->modalHeading('Obriši avansnu fakturu')
-                        ->modalDescription('Da li ste sigurni da želite da obrišete ovu avansnu fakturu? Ova akcija se ne može poništiti.')
-                        ->modalSubmitActionLabel('Obriši')
-                        ->action(function ($record) {
-                            $record->delete();
-
-                            Notification::make()
-                                ->title('Avansna faktura obrisana')
-                                ->body("Avansna faktura broj {$record->invoice_number} je uspešno obrisana.")
-                                ->success()
-                                ->send();
                         }),
                 ])
                     ->label('Akcije')

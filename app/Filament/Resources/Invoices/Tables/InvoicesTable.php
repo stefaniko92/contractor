@@ -192,21 +192,69 @@ class InvoicesTable
                 //
             ])
             ->recordActions([
-                EditAction::make()
-                    ->label('Uredi')
-                    ->icon('heroicon-o-pencil')
+                Action::make('print')
+                    ->label('Štampaj')
+                    ->icon('heroicon-o-printer')
+                    ->color('gray')
+                    ->url(fn ($record): string => route('invoices.print', $record))
+                    ->openUrlInNewTab(),
+
+                Action::make('enter_payment')
+                    ->label('Unesi plaćanje')
+                    ->icon('heroicon-o-currency-dollar')
+                    ->color('success')
                     ->visible(function ($record) {
-                        // Don't allow editing of storno invoices
+                        // Don't show payment entry for storno invoices
                         return ! $record->is_storno;
+                    })
+                    ->form([
+                        DatePicker::make('payment_date')
+                            ->label('Datum plaćanja')
+                            ->default(now())
+                            ->required(),
+                        TextInput::make('payment_amount')
+                            ->label('Iznos plaćanja')
+                            ->numeric()
+                            ->step(0.01)
+                            ->required()
+                            ->helperText(function ($record) {
+                                return 'Ukupan iznos fakture: '.number_format($record->amount, 2).' '.$record->currency;
+                            }),
+                    ])
+                    ->fillForm(function ($record) {
+                        return [
+                            'payment_date' => now(),
+                            'payment_amount' => $record->amount,
+                        ];
+                    })
+                    ->action(function (array $data, $record) {
+                        // Update invoice status based on payment amount
+                        $paymentAmount = (float) $data['payment_amount'];
+                        $invoiceAmount = (float) $record->amount;
+
+                        if ($paymentAmount >= $invoiceAmount) {
+                            $record->update(['status' => 'charged']);
+                            $statusMessage = 'Status fakture promenjen na "Naplaćena"';
+                        } else {
+                            $record->update(['status' => 'uncharged']);
+                            $statusMessage = 'Status fakture promenjen na "Nenaplaćena" (delimično plaćanje)';
+                        }
+
+                        Notification::make()
+                            ->title('Plaćanje zabeleženo')
+                            ->body('Plaćanje od '.number_format($paymentAmount, 2).' '.$record->currency." je uspešno zabeleženo za fakturu {$record->invoice_number}. ".$statusMessage)
+                            ->success()
+                            ->send();
                     }),
 
                 ActionGroup::make([
-                    Action::make('print')
-                        ->label('Štampaj')
-                        ->icon('heroicon-o-printer')
-                        ->color('gray')
-                        ->url(fn ($record): string => route('invoices.print', $record))
-                        ->openUrlInNewTab(),
+                    EditAction::make()
+                        ->label('Uredi')
+                        ->icon('heroicon-o-pencil')
+                        ->visible(function ($record) {
+                            // Don't allow editing of storno invoices
+                            return ! $record->is_storno;
+                        }),
 
                     Action::make('download')
                         ->label('Preuzmi PDF')
@@ -226,31 +274,6 @@ class InvoicesTable
                                     'copy_from_invoice' => $record->id,
                                 ])
                             );
-                        }),
-
-                    Action::make('issue')
-                        ->label('Izdaj fakturu')
-                        ->icon('heroicon-o-check-circle')
-                        ->color('success')
-                        ->requiresConfirmation()
-                        ->modalHeading('Izdaj fakturu')
-                        ->modalDescription(function ($record) {
-                            return "Da li želite da izdajete fakturu {$record->invoice_number}? Status će biti promenjen na 'Izdata'.";
-                        })
-                        ->modalSubmitActionLabel('Izdaj')
-                        ->modalIcon('heroicon-o-check-circle')
-                        ->visible(function ($record) {
-                            // Only show issue action for invoices in preparation
-                            return ! $record->is_storno && $record->status === 'in_preparation';
-                        })
-                        ->action(function ($record) {
-                            $record->update(['status' => 'issued']);
-
-                            Notification::make()
-                                ->title('Faktura izdata')
-                                ->body("Faktura {$record->invoice_number} je uspešno izdata.")
-                                ->success()
-                                ->send();
                         }),
 
                     Action::make('storno')
@@ -584,54 +607,6 @@ class InvoicesTable
                                     'trace' => $e->getTraceAsString(),
                                 ]);
                             }
-                        }),
-
-                    Action::make('enter_payment')
-                        ->label('Unesi plaćanje')
-                        ->icon('heroicon-o-currency-dollar')
-                        ->color('success')
-                        ->visible(function ($record) {
-                            // Don't show payment entry for storno invoices
-                            return ! $record->is_storno;
-                        })
-                        ->form([
-                            DatePicker::make('payment_date')
-                                ->label('Datum plaćanja')
-                                ->default(now())
-                                ->required(),
-                            TextInput::make('payment_amount')
-                                ->label('Iznos plaćanja')
-                                ->numeric()
-                                ->step(0.01)
-                                ->required()
-                                ->helperText(function ($record) {
-                                    return 'Ukupan iznos fakture: '.number_format($record->amount, 2).' '.$record->currency;
-                                }),
-                        ])
-                        ->fillForm(function ($record) {
-                            return [
-                                'payment_date' => now(),
-                                'payment_amount' => $record->amount,
-                            ];
-                        })
-                        ->action(function (array $data, $record) {
-                            // Update invoice status based on payment amount
-                            $paymentAmount = (float) $data['payment_amount'];
-                            $invoiceAmount = (float) $record->amount;
-
-                            if ($paymentAmount >= $invoiceAmount) {
-                                $record->update(['status' => 'charged']);
-                                $statusMessage = 'Status fakture promenjen na "Naplaćena"';
-                            } else {
-                                $record->update(['status' => 'uncharged']);
-                                $statusMessage = 'Status fakture promenjen na "Nenaplaćena" (delimično plaćanje)';
-                            }
-
-                            Notification::make()
-                                ->title('Plaćanje zabeleženo')
-                                ->body('Plaćanje od '.number_format($paymentAmount, 2).' '.$record->currency." je uspešno zabeleženo za fakturu {$record->invoice_number}. ".$statusMessage)
-                                ->success()
-                                ->send();
                         }),
 
                     Action::make('delete')
