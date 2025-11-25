@@ -16,6 +16,8 @@ class IconLayoutTest extends Page
 
     protected static ?int $navigationSort = 10;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected string $view = 'filament.pages.icon-layout-test';
 
     public static function getNavigationGroup(): ?string

@@ -84,6 +84,10 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-document-text'),
                 NavigationGroup::make('Moja kompanija')
                     ->icon('heroicon-o-building-office'),
+                NavigationGroup::make('Postavke')
+                    ->icon('heroicon-o-cog-6-tooth'),
+                NavigationGroup::make('Administracija')
+                    ->icon('heroicon-o-shield-check'),
                 NavigationGroup::make('Testing & Development')
                     ->icon('heroicon-o-code-bracket'),
             ])
@@ -115,8 +119,9 @@ class AdminPanelProvider extends PanelProvider
                     .fi-form-actions,
                     .fi-fo-actions,
                     form > .fi-section:last-child,
+                    form > button:last-child,
                     [wire\\:submit] > div:last-child {
-                        margin-top: 15px !important;
+                        margin-top: 32px !important;
                     }
                 </style>'
             )

@@ -14,28 +14,28 @@
                     <tr class="bg-gray-50 dark:bg-white/5">
                         <th class="fi-ta-header-cell px-3 py-3.5 sm:first-of-type:ps-6 sm:last-of-type:pe-6">
                             <span class="group flex w-full items-center gap-x-1 whitespace-nowrap justify-start">
-                                <span class="fi-ta-header-cell-label text-sm font-semibold text-gray-950 dark:text-white">
+                                <span class="fi-ta-header-cell-label text-sm font-semibold !text-gray-950 dark:!text-white">
                                     {{ __('kpo.fields.year') }}
                                 </span>
                             </span>
                         </th>
                         <th class="fi-ta-header-cell px-3 py-3.5 sm:first-of-type:ps-6 sm:last-of-type:pe-6">
                             <span class="group flex w-full items-center gap-x-1 whitespace-nowrap justify-center">
-                                <span class="fi-ta-header-cell-label text-sm font-semibold text-gray-950 dark:text-white">
+                                <span class="fi-ta-header-cell-label text-sm font-semibold !text-gray-950 dark:!text-white">
                                     {{ __('kpo.fields.invoice_count') }}
                                 </span>
                             </span>
                         </th>
                         <th class="fi-ta-header-cell px-3 py-3.5 sm:first-of-type:ps-6 sm:last-of-type:pe-6">
                             <span class="group flex w-full items-center gap-x-1 whitespace-nowrap justify-end">
-                                <span class="fi-ta-header-cell-label text-sm font-semibold text-gray-950 dark:text-white">
+                                <span class="fi-ta-header-cell-label text-sm font-semibold !text-gray-950 dark:!text-white">
                                     {{ __('kpo.fields.total_amount') }}
                                 </span>
                             </span>
                         </th>
                         <th class="fi-ta-header-cell px-3 py-3.5 sm:first-of-type:ps-6 sm:last-of-type:pe-6">
                             <span class="group flex w-full items-center gap-x-1 whitespace-nowrap justify-end">
-                                <span class="fi-ta-header-cell-label text-sm font-semibold text-gray-950 dark:text-white">
+                                <span class="fi-ta-header-cell-label text-sm font-semibold !text-gray-950 dark:!text-white">
                                     {{ __('kpo.fields.actions') }}
                                 </span>
                             </span>
@@ -52,7 +52,7 @@
                                             <div class="flex">
                                                 <div class="flex max-w-max">
                                                     <div class="fi-ta-text-item inline-flex items-center gap-1.5">
-                                                        <span class="fi-ta-text-item-label text-sm leading-6 text-gray-950 dark:text-white font-medium">
+                                                        <span class="fi-ta-text-item-label text-sm leading-6 font-medium !text-gray-950 dark:!text-white">
                                                             {{ $yearData['year'] }}
                                                         </span>
                                                     </div>
@@ -68,7 +68,7 @@
                                         <div class="fi-ta-text grid w-full gap-y-1 px-3 py-4">
                                             <div class="flex">
                                                 <div class="flex max-w-max">
-                                                    <x-filament::badge color="gray">
+                                                    <x-filament::badge color="info">
                                                         {{ $yearData['invoice_count'] }}
                                                     </x-filament::badge>
                                                 </div>
@@ -84,7 +84,7 @@
                                             <div class="flex">
                                                 <div class="flex max-w-max">
                                                     <div class="fi-ta-text-item inline-flex items-center gap-1.5">
-                                                        <span class="fi-ta-text-item-label text-sm leading-6 text-gray-950 dark:text-white font-semibold">
+                                                        <span class="fi-ta-text-item-label text-sm leading-6 font-semibold !text-gray-950 dark:!text-white">
                                                             {{ $yearData['total_amount'] }} {{ $yearData['currency'] }}
                                                         </span>
                                                     </div>
