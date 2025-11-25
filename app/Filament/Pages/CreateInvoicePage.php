@@ -353,9 +353,12 @@ class CreateInvoicePage extends Page implements HasForms
                             TextInput::make('phone')
                                 ->label(__('create_invoice.client_form.phone')),
                         ])
-                        ->createOptionModalHeading('Dodaj novog klijenta')
-                        ->createOptionModalSubmitActionLabel('Kreiraj klijenta')
-                        ->createOptionModalCancelActionLabel('Otkaži')
+                        ->createOptionAction(function (Action $action) {
+                            return $action
+                                ->modalHeading('Dodaj novog klijenta')
+                                ->modalSubmitActionLabel('Kreiraj klijenta')
+                                ->modalCancelActionLabel('Otkaži');
+                        })
                         ->createOptionUsing(function (array $data, $set) {
                             $data['user_id'] = Auth::id();
                             $data['is_domestic'] = $this->invoice_type === 'domestic';
