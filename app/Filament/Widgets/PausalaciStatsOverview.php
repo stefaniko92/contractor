@@ -11,17 +11,22 @@ use Illuminate\Support\Facades\Auth;
 
 class PausalaciStatsOverview extends StatsOverviewWidget
 {
+    protected int | string | array $columnSpan = 2;
+
     protected function getStats(): array
     {
         $userId = Auth::id();
         $currentYear = now()->year;
 
-        // Calculate annual income
-        $annualIncome = Income::where('user_id', $userId)
-            ->whereYear('date', $currentYear)
-            ->sum('amount');
+        // Calculate annual income from domestic invoices only
+        $annualIncome = Invoice::where('invoices.user_id', $userId)
+            ->join('clients', 'invoices.client_id', '=', 'clients.id')
+            ->where('clients.is_domestic', true)
+            ->whereYear('invoices.issue_date', $currentYear)
+            ->whereNotNull('invoices.issue_date')
+            ->sum('invoices.amount');
 
-        // Pausalac limit for 2024 (6 million RSD)
+        // Pausalac limit for current year (6 million RSD)
         $pausalaciLimit = 6000000;
         $remainingLimit = $pausalaciLimit - $annualIncome;
         $percentageUsed = ($annualIncome / $pausalaciLimit) * 100;
