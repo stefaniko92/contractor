@@ -10,7 +10,12 @@ use Illuminate\Support\Facades\DB;
 
 class TwelveMonthIncomeWidget extends StatsOverviewWidget
 {
-    protected int | string | array $columnSpan = 2;
+    protected int | string | array $columnSpan = 1;
+
+    protected function getColumns(): int
+    {
+        return 1;
+    }
 
     protected function getStats(): array
     {
@@ -31,17 +36,26 @@ class TwelveMonthIncomeWidget extends StatsOverviewWidget
         $remainingTwelveMonth = $twelveMonthLimit - $twelveMonthIncome;
         $percentageUsedTwelveMonth = ($twelveMonthIncome / $twelveMonthLimit) * 100;
 
+        $color = 'success';
+        if ($percentageUsedTwelveMonth > 80) {
+            $color = 'danger';
+        } elseif ($percentageUsedTwelveMonth > 60) {
+            $color = 'warning';
+        }
+
+        $icon = $percentageUsedTwelveMonth > 80 ? 'heroicon-m-exclamation-triangle' : 'heroicon-m-check-circle';
+
         return [
             Stat::make('Prihod u 12 meseci', number_format($twelveMonthIncome, 0, ',', '.').' RSD')
                 ->description('Od ukupno '.number_format($twelveMonthLimit, 0, ',', '.').' RSD')
                 ->descriptionIcon('heroicon-m-calendar')
-                ->color($percentageUsedTwelveMonth > 80 ? 'danger' : ($percentageUsedTwelveMonth > 60 ? 'warning' : 'success'))
+                ->color($color)
                 ->chart([12, 15, 18, 20, 22, 25, 28, 30, 32, 35, 38, 40]),
 
             Stat::make('Preostalo do limita (12 mes.)', number_format($remainingTwelveMonth, 0, ',', '.').' RSD')
                 ->description(number_format($percentageUsedTwelveMonth, 1).'% iskorišćeno')
-                ->descriptionIcon($percentageUsedTwelveMonth > 80 ? 'heroicon-m-exclamation-triangle' : 'heroicon-m-check-circle')
-                ->color($percentageUsedTwelveMonth > 80 ? 'danger' : ($percentageUsedTwelveMonth > 60 ? 'warning' : 'success')),
+                ->descriptionIcon($icon)
+                ->color($color),
         ];
     }
 }
