@@ -29,6 +29,15 @@ class TwelveMonthIncomeChart extends ChartWidget
 
         $twelveMonthLimit = 8000000;
         $remaining = $twelveMonthLimit - $twelveMonthIncome;
+        $percentageUsed = ($twelveMonthIncome / $twelveMonthLimit) * 100;
+
+        // Choose color based on usage percentage
+        $fillColor = 'rgb(34, 197, 94)'; // Green for safe
+        if ($percentageUsed > 80) {
+            $fillColor = 'rgb(239, 68, 68)'; // Red for danger
+        } elseif ($percentageUsed > 60) {
+            $fillColor = 'rgb(251, 146, 60)'; // Orange for warning
+        }
 
         return [
             'datasets' => [
@@ -36,8 +45,8 @@ class TwelveMonthIncomeChart extends ChartWidget
                     'label' => 'Prihod',
                     'data' => [$twelveMonthIncome, max(0, $remaining)],
                     'backgroundColor' => [
-                        'rgb(59, 130, 246)',
-                        'rgb(229, 231, 235)',
+                        $fillColor,
+                        'rgb(226, 232, 240)',
                     ],
                 ],
             ],
@@ -48,5 +57,19 @@ class TwelveMonthIncomeChart extends ChartWidget
     protected function getType(): string
     {
         return 'pie';
+    }
+
+    protected function getOptions(): array
+    {
+        return [
+            'plugins' => [
+                'legend' => [
+                    'display' => true,
+                    'position' => 'right',
+                ],
+            ],
+            'maintainAspectRatio' => true,
+            'aspectRatio' => 2,
+        ];
     }
 }
