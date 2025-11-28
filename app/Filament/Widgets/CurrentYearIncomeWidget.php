@@ -9,7 +9,9 @@ use Illuminate\Support\Facades\Auth;
 
 class CurrentYearIncomeWidget extends StatsOverviewWidget
 {
-    protected int | string | array $columnSpan = 1;
+    protected int|string|array $columnSpan = 'full';
+
+    protected static bool $isDiscovered = false;
 
     protected function getColumns(): int
     {

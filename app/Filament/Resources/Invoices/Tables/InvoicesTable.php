@@ -107,8 +107,10 @@ class InvoicesTable
                         if ($record->efakturaInvoice) {
                             $sent = $record->efakturaInvoice->sent_at?->format('d.m.Y H:i');
                             $updated = $record->efakturaInvoice->updated_at?->format('d.m.Y H:i');
+
                             return "Poslato: {$sent}\nAžurirano: {$updated}";
                         }
+
                         return null;
                     }),
 

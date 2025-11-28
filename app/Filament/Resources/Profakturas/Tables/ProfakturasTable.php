@@ -3,14 +3,11 @@
 namespace App\Filament\Resources\Profakturas\Tables;
 
 use App\Models\Invoice;
-use App\Models\InvoiceItem;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;

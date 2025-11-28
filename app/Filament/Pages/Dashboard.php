@@ -2,38 +2,36 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Widgets\CurrentYearIncomeChart;
-use App\Filament\Widgets\CurrentYearIncomeWidget;
-use App\Filament\Widgets\QuickStatsWidget;
-use App\Filament\Widgets\TwelveMonthIncomeChart;
-use App\Filament\Widgets\TwelveMonthIncomeWidget;
+use App\Filament\Widgets\CurrentYearIncomeGroup;
+use App\Filament\Widgets\PendingObligationsWidget;
+use App\Filament\Widgets\TwelveMonthIncomeGroup;
+use App\Filament\Widgets\UnpaidInvoicesWidget;
 use App\Filament\Widgets\WelcomeWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
 
 class Dashboard extends BaseDashboard
 {
-    public function getColumns(): int | array
+    public function getColumns(): int|array
     {
         return [
-            'md' => 1,
-            'xl' => 2,
+            'md' => 2,
+            'xl' => 4,
         ];
     }
 
     public function getWidgets(): array
     {
         return [
-            // First row: Welcome (left) + Quick stats (right)
+            // First row: Welcome + Neplaćene fakture + Obaveze za plaćanje
             WelcomeWidget::class,
-            QuickStatsWidget::class,
+            UnpaidInvoicesWidget::class,
+            PendingObligationsWidget::class,
 
-            // Second row: Current year (6M) stats (left) + 12-month (8M) stats (right)
-            CurrentYearIncomeWidget::class,
-            TwelveMonthIncomeWidget::class,
+            // Second row: Left (50%) - Current year stats + chart
+            CurrentYearIncomeGroup::class,
 
-            // Third row: Pie charts
-            CurrentYearIncomeChart::class,
-            TwelveMonthIncomeChart::class,
+            // Second row: Right (50%) - 12-month stats + chart
+            TwelveMonthIncomeGroup::class,
         ];
     }
 }

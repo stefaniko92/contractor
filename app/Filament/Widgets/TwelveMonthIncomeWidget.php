@@ -6,11 +6,12 @@ use App\Models\Invoice;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class TwelveMonthIncomeWidget extends StatsOverviewWidget
 {
-    protected int | string | array $columnSpan = 1;
+    protected int|string|array $columnSpan = 'full';
+
+    protected static bool $isDiscovered = false;
 
     protected function getColumns(): int
     {

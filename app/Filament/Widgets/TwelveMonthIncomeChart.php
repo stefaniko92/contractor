@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Auth;
 
 class TwelveMonthIncomeChart extends ChartWidget
 {
-    protected int | string | array $columnSpan = 1;
+    protected int|string|array $columnSpan = 'full';
+
+    protected static bool $isDiscovered = false;
 
     protected ?string $heading = 'Prihod u 12 meseci (8M limit)';
 

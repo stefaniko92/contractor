@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Auth;
 
 class CurrentYearIncomeChart extends ChartWidget
 {
-    protected int | string | array $columnSpan = 1;
+    protected int|string|array $columnSpan = 'full';
+
+    protected static bool $isDiscovered = false;
 
     protected ?string $heading = 'Godišnji prihod (6M limit)';
 

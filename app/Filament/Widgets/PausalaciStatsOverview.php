@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Auth;
 
 class PausalaciStatsOverview extends StatsOverviewWidget
 {
-    protected int | string | array $columnSpan = 2;
+    protected int|string|array $columnSpan = 2;
 
     protected function getStats(): array
     {
