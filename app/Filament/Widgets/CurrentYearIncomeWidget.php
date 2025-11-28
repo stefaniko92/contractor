@@ -15,7 +15,7 @@ class CurrentYearIncomeWidget extends StatsOverviewWidget
 
     protected function getColumns(): int
     {
-        return 1;
+        return 2;
     }
 
     protected function getStats(): array
