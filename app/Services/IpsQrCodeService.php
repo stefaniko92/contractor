@@ -19,66 +19,133 @@ class IpsQrCodeService
             }
         }
 
-        // NBS IPS QR code format
-        $lines = [];
+        $parts = [];
 
-        // K: Company code (fixed)
-        $lines[] = 'K:PR';
+        // K: NBS IPS nalog za plaćanje
+        $parts[] = 'K:PR';
 
-        // V: Version (01 for NBS IPS)
-        $lines[] = 'V:01';
+        // V: Verzija
+        $parts[] = 'V:01';
 
-        // C: Character set (1 = UTF-8)
-        $lines[] = 'C:1';
+        // C: Karakter set (1 = UTF-8)
+        $parts[] = 'C:1';
 
-        // R: Recipient account number
-        $lines[] = 'R:'.$this->formatAccountNumber($data['recipient_account']);
+        // R: Račun primaoca – TAČNO 18 cifara, bez crtice
+        $parts[] = 'R:' . $this->formatAccountNumber($data['recipient_account']);
 
-        // N: Recipient name
-        $lines[] = 'N:'.mb_substr($data['recipient_name'], 0, 70);
+        // N: Naziv primaoca (max 70)
+        $parts[] = 'N:' . $this->sanitizeText($data['recipient_name'], 70);
 
-        // I: Amount in dinars (RSD)
-        $lines[] = 'I:'.number_format($data['amount'], 2, ',', '');
+        // I: Iznos – RSD####,##
+        $parts[] = 'I:' . $this->formatAmount($data['amount']);
 
-        // SF: Payment code (default 289 if not provided)
+        // SF: Šifra plaćanja (npr. 289 ili 253)
         $paymentCode = $data['payment_code'] ?? '289';
-        $lines[] = 'SF:'.$paymentCode;
+        $parts[] = 'SF:' . $paymentCode;
 
-        // S: Purpose of payment (optional)
-        if (! empty($data['purpose'])) {
-            $lines[] = 'S:'.mb_substr($data['purpose'], 0, 35);
+        // S: Svrha plaćanja (opciono, max 35)
+        if (!empty($data['purpose'])) {
+            $parts[] = 'S:' . $this->sanitizeText($data['purpose'], 35);
         }
 
-        // RO: Model and reference number (optional)
-        if (! empty($data['model']) && ! empty($data['reference_number'])) {
-            $lines[] = 'RO:'.$data['model'].'-'.$data['reference_number'];
+        // RO: Model + poziv na broj (opciono)
+        if (!empty($data['model']) && !empty($data['reference_number'])) {
+            $model = $this->formatModel($data['model']);              // npr. "97"
+            $ref   = $this->formatReferenceNumber($data['reference_number']); // samo cifre
+            $parts[] = 'RO:' . $model . $ref;                         // npr. "971234567890..."
         }
 
-        // O: Payer name (optional)
-        if (! empty($data['payer_name'])) {
-            $lines[] = 'O:'.mb_substr($data['payer_name'], 0, 70);
+        // P: Platilac (opciono; ako ga nema, tag se uopšte NE dodaje)
+        if (!empty($data['payer_name'])) {
+            // Ako hoćeš i adresu: spoji ime + adresu sa "\r\n"
+            $payer = $this->sanitizeText($data['payer_name'], 70);
+            $parts[] = 'P:' . $payer;
         }
 
-        return implode("\n", $lines);
+        // Važno: string se NE sme završavati sa '|'
+        return implode('|', $parts);
     }
 
     /**
-     * Format account number for NBS IPS QR code
+     * Račun mora imati tačno 18 cifara (bez '-', ' ').
+     * Ovde sam namerno stroži – ako nije 18 cifara, baca exception,
+     * da ne bi "mažio" loš račun nulama na pogrešnom mestu.
      */
     private function formatAccountNumber(string $account): string
     {
-        // Remove any spaces and dashes
-        $account = preg_replace('/[\s\-]/', '', $account);
+        // ukloni razmake i crtice
+        $account = preg_replace('/[\s-]/', '', $account);
 
-        // Ensure it's 18 digits
-        if (strlen($account) !== 18) {
-            // Try to format if it's missing dashes
-            if (strlen($account) < 18) {
-                // Pad with zeros if needed
-                $account = str_pad($account, 18, '0', STR_PAD_LEFT);
-            }
+        // mora da sadrži samo cifre
+        if (!ctype_digit($account)) {
+            throw new \Exception("Invalid account number: must contain only digits");
         }
 
-        return $account;
+        // minimum je 4 cifre (3 za banku + bar 1 za račun),
+        // više od 18 nije dozvoljeno
+        $length = strlen($account);
+
+        if ($length < 4) {
+            throw new \Exception("Invalid account number: too short to contain bank code + account");
+        }
+
+        if ($length > 18) {
+            throw new \Exception("Invalid account number: longer than 18 digits");
+        }
+
+        // tačno 18 cifara → već je OK
+        if ($length === 18) {
+            return $account;
+        }
+
+        // manje od 18 → dopunjuj deo posle prve 3 cifre nulama s LEVE strane
+        $bankCode = substr($account, 0, 3);
+        $rest     = substr($account, 3);
+
+        if (strlen($rest) > 15) {
+            // teoretski ne bi trebalo da se desi, ali čisto radi sigurnosti
+            throw new \Exception("Invalid account number: account part longer than 15 digits");
+        }
+
+        // dopuni deo računa na 15 cifara nulama S LEVE STRANE
+        $restPadded = str_pad($rest, 15, '0', STR_PAD_LEFT);
+
+        return $bankCode . $restPadded;
+    }
+
+    /**
+     * I: RSD + iznos sa zarezom i dve decimale
+     * Primer: 15885.64 -> "RSD15885,64"
+     */
+    private function formatAmount(float $amount): string
+    {
+        return 'RSD' . number_format($amount, 2, ',', '');
+    }
+
+    /**
+     * Sanira tekst za tagove N, S, P – skida '|' i seče na max dužinu.
+     */
+    private function sanitizeText(string $text, int $limit): string
+    {
+        $text = trim($text);
+        $text = str_replace('|', ' ', $text); // '|' ne sme ući u payload
+        return mb_substr($text, 0, $limit, 'UTF-8');
+    }
+
+    /**
+     * Model – dve cifre (00, 97...)
+     */
+    private function formatModel(string $model): string
+    {
+        $model = preg_replace('/\D/', '', $model);
+        return str_pad($model, 2, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Poziv na broj – samo cifre (bez '-', '/', ' ')
+     */
+    private function formatReferenceNumber(string $reference): string
+    {
+        return preg_replace('/\D/', '', $reference);
     }
 }
