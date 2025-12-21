@@ -6,7 +6,11 @@ use App\Http\Controllers\Webhooks\SefEfakturaWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    if (auth()->check()) {
+        return redirect('/admin');
+    }
+
+    return redirect('/admin/login');
 });
 
 // KPO Book routes - requires authentication
