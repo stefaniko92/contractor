@@ -146,7 +146,7 @@ class Register extends BaseRegister
             // This won't use Stripe, just a local database record
             Subscription::create([
                 'user_id' => $user->id,
-                'type' => 'default',
+                'name' => 'default',
                 'stripe_id' => 'free_plan_'.time(),
                 'stripe_status' => 'active',
                 'stripe_price' => null,
