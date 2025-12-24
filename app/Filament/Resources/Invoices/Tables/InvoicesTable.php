@@ -8,6 +8,7 @@ use App\Models\InvoiceItem;
 use App\Services\SefService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -15,7 +16,10 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
 
 class InvoicesTable
@@ -28,7 +32,9 @@ class InvoicesTable
                 TextColumn::make('client.company_name')
                     ->label('Klijent')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->wrap()
+                    ->width('250px'),
 
                 TextColumn::make('invoice_number')
                     ->label('Broj fakture')
@@ -191,8 +197,47 @@ class InvoicesTable
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
-                //
-            ])
+                SelectFilter::make('status')
+                    ->label('Status')
+                    ->options([
+                        'sent' => 'Poslana',
+                        'issued' => 'Izdata',
+                        'in_preparation' => 'U pripremi',
+                        'charged' => 'Naplaćena',
+                        'uncharged' => 'Nenaplaćena',
+                        'storned' => 'Stornirana',
+                    ])
+                    ->multiple()
+                    ->searchable(),
+
+                SelectFilter::make('currency')
+                    ->label('Valuta')
+                    ->options([
+                        'RSD' => 'RSD',
+                        'EUR' => 'EUR',
+                        'USD' => 'USD',
+                    ])
+                    ->multiple()
+                    ->searchable(),
+
+                SelectFilter::make('year')
+                    ->label('Godina')
+                    ->options(function () {
+                        $currentYear = now()->year;
+                        $years = range($currentYear - 5, $currentYear + 1);
+
+                        return array_combine($years, $years);
+                    })
+                    ->query(function ($query, $data) {
+                        if (! empty($data['value'])) {
+                            return $query->whereYear('issue_date', $data['value']);
+                        }
+
+                        return $query;
+                    })
+                    ->searchable(),
+            ], layout: FiltersLayout::AboveContentCollapsible)
+            ->defaultPaginationPageOption(25)
             ->recordActions([
                 Action::make('print')
                     ->label('Štampaj')
@@ -636,7 +681,44 @@ class InvoicesTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    BulkAction::make('mark_as_paid')
+                        ->label('Označi kao plaćeno')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Označi fakture kao plaćene')
+                        ->modalDescription('Da li sigurno želite da označite odabrane fakture kao plaćene? Datum fakture će biti korišćen kao datum plaćanja.')
+                        ->modalSubmitActionLabel('Označi kao plaćeno')
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records) {
+                            $count = 0;
+                            foreach ($records as $record) {
+                                if (! $record->is_storno && $record->status !== 'charged') {
+                                    $record->update(['status' => 'charged']);
+                                    $count++;
+                                }
+                            }
+
+                            Notification::make()
+                                ->title('Fakture označene kao plaćene')
+                                ->body("Uspešno je označeno {$count} faktura/e kao plaćeno.")
+                                ->success()
+                                ->send();
+                        }),
+
+                    DeleteBulkAction::make()
+                        ->label('Obriši')
+                        ->requiresConfirmation()
+                        ->modalHeading('Obriši fakture')
+                        ->modalDescription('Da li ste sigurni da želite da obrišete odabrane fakture? Ova akcija se ne može poništiti.')
+                        ->modalSubmitActionLabel('Obriši')
+                        ->deselectRecordsAfterCompletion()
+                        ->successNotification(
+                            Notification::make()
+                                ->title('Fakture obrisane')
+                                ->body('Odabrane fakture su uspešno obrisane.')
+                                ->success()
+                        ),
                 ]),
             ]);
     }
