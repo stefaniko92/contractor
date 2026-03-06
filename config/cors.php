@@ -19,14 +19,12 @@ return [
 
     'allowed_methods' => ['POST'],
 
-    'allowed_origins' => array_filter([
-        'https://pausalci.com',
-        'https://www.pausalci.com',
-        env('APP_ENV') === 'local' ? 'http://localhost:3000' : null,
-        env('APP_ENV') === 'local' ? 'http://localhost:5173' : null,
-        env('APP_ENV') === 'local' ? 'http://127.0.0.1:3000' : null,
-        env('APP_ENV') === 'local' ? 'http://127.0.0.1:5173' : null,
-    ]),
+    'allowed_origins' => env('APP_ENV') === 'local'
+        ? ['*'] // Allow all origins in development
+        : array_filter([
+            'https://pausalci.com',
+            'https://www.pausalci.com',
+        ]),
 
     'allowed_origins_patterns' => [],
 
