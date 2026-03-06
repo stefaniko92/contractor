@@ -36,7 +36,8 @@ class PublicInvoiceService
                 $user,
                 $client,
                 $data['invoice'],
-                $data['items']
+                $data['items'],
+                $data['invoice_type']
             );
 
             // Generate PDF
@@ -108,8 +109,11 @@ class PublicInvoiceService
     /**
      * Create invoice with items
      */
-    private function createInvoice(User $user, Client $client, array $invoiceData, array $itemsData): Invoice
+    private function createInvoice(User $user, Client $client, array $invoiceData, array $itemsData, string $invoiceType): Invoice
     {
+        // Map API invoice_type to database enum
+        $dbInvoiceType = $invoiceType === 'domaca' ? 'domestic' : 'foreign';
+
         // Create invoice
         $invoice = Invoice::create([
             'user_id' => $user->id,
@@ -122,7 +126,7 @@ class PublicInvoiceService
             'description' => $invoiceData['note'] ?? '',
             'amount' => 0, // Will be updated automatically by Invoice model
             'status' => 'issued',
-            'invoice_type' => 'standard',
+            'invoice_type' => $dbInvoiceType,
             'invoice_document_type' => 'faktura',
         ]);
 
