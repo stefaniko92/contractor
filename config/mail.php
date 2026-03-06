@@ -115,4 +115,16 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Contact Form Recipient
+    |--------------------------------------------------------------------------
+    |
+    | This email address will receive all messages submitted through the
+    | public contact form API endpoint.
+    |
+    */
+
+    'contact_recipient' => env('CONTACT_EMAIL', 'stefanrakic92@gmail.com'),
+
 ];
