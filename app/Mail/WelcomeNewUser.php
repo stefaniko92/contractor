@@ -36,10 +36,10 @@ class WelcomeNewUser extends Mailable
      */
     public function content(): Content
     {
-        $resetUrl = url(config('app.url').route('password.reset', [
+        $resetUrl = route('filament.admin.auth.password-reset.reset', [
             'token' => $this->resetToken,
             'email' => $this->user->email,
-        ], false));
+        ]);
 
         return new Content(
             view: 'emails.welcome-new-user',
