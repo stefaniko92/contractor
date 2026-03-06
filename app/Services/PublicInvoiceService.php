@@ -43,12 +43,13 @@ class PublicInvoiceService
             // Generate PDF
             $pdfPath = $this->generatePdf($invoice);
 
-            // Send email
-            $this->sendEmail($user, $invoice, $pdfPath, $isNewUser);
+            // Send email and get reset URL if new user
+            $resetUrl = $this->sendEmail($user, $invoice, $pdfPath, $isNewUser);
 
             return [
                 'user_created' => $isNewUser,
                 'invoice' => $invoice,
+                'reset_url' => $resetUrl,
             ];
         });
     }
@@ -70,6 +71,7 @@ class PublicInvoiceService
             'email' => $email,
             'password' => bcrypt(Str::random(32)), // Random password, user will set via reset link
             'company_name' => $sellerData['company_name'],
+            'tax_id' => $sellerData['pib'],
             'address' => $sellerData['address'],
             'phone' => $sellerData['phone'] ?? null,
             'default_currency' => 'RSD',
@@ -259,8 +261,9 @@ class PublicInvoiceService
 
     /**
      * Send emails: invoice PDF and welcome email for new users
+     * Returns reset URL for new users, null otherwise
      */
-    private function sendEmail(User $user, Invoice $invoice, string $pdfPath, bool $isNewUser): void
+    private function sendEmail(User $user, Invoice $invoice, string $pdfPath, bool $isNewUser): ?string
     {
         // Always send invoice PDF immediately
         Mail::to($user->email)->send(
@@ -271,10 +274,20 @@ class PublicInvoiceService
         if ($isNewUser) {
             $resetToken = Password::createToken($user);
 
+            // Generate reset URL using config APP_URL
+            $resetUrl = config('app.url').'/admin/password-reset/reset?'.http_build_query([
+                'token' => $resetToken,
+                'email' => $user->email,
+            ]);
+
             // Send welcome email (can be queued for async delivery)
             Mail::to($user->email)->send(
                 new \App\Mail\WelcomeNewUser($user, $resetToken)
             );
+
+            return $resetUrl;
         }
+
+        return null;
     }
 }

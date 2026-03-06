@@ -68,11 +68,23 @@ curl -X POST http://contractor.test/api/public/generate-invoice \
 ```
 
 ### Response
+
+**Za novog korisnika:**
 ```json
 {
   "success": true,
   "message": "Faktura je poslata na user@example.com.",
-  "user_created": true
+  "user_created": true,
+  "reset_url": "https://app.pausalci.com/admin/password-reset/reset?token=...&email=user%40example.com"
+}
+```
+
+**Za postojećeg korisnika:**
+```json
+{
+  "success": true,
+  "message": "Faktura je poslata na user@example.com.",
+  "user_created": false
 }
 ```
 

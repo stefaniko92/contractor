@@ -36,7 +36,8 @@ class WelcomeNewUser extends Mailable
      */
     public function content(): Content
     {
-        $resetUrl = route('filament.admin.auth.password-reset.reset', [
+        // Generate reset URL using config APP_URL to ensure correct domain
+        $resetUrl = config('app.url').'/admin/password-reset/reset?'.http_build_query([
             'token' => $this->resetToken,
             'email' => $this->user->email,
         ]);

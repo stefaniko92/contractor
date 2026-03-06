@@ -40,11 +40,27 @@ class PublicInvoiceApiTest extends TestCase
             ->assertJson([
                 'success' => true,
                 'user_created' => true,
+            ])
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'user_created',
+                'reset_url', // Should include reset URL for new users
             ]);
 
-        // Verify user was created
+        // Verify reset URL is present and valid
+        $resetUrl = $response->json('reset_url');
+        $this->assertNotNull($resetUrl);
+        $this->assertStringContainsString('/admin/password-reset/reset', $resetUrl);
+        $this->assertStringContainsString('token=', $resetUrl);
+        $this->assertStringContainsString('email=', $resetUrl);
+        $this->assertStringContainsString(urlencode('test@example.com'), $resetUrl);
+
+        // Verify user was created with tax_id (PIB)
         $this->assertDatabaseHas('users', [
             'email' => 'test@example.com',
+            'company_name' => 'Prodavac d.o.o.',
+            'tax_id' => '123456789',
         ]);
 
         // Verify company was created
@@ -83,7 +99,8 @@ class PublicInvoiceApiTest extends TestCase
             ->assertJson([
                 'success' => true,
                 'user_created' => false,
-            ]);
+            ])
+            ->assertJsonMissing(['reset_url']); // Should NOT include reset URL for existing users
 
         // Should only have one user with this email
         $this->assertEquals(1, User::where('email', 'existing@example.com')->count());

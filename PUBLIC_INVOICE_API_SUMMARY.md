@@ -209,13 +209,27 @@ Tests:
 ## API Response Examples
 
 ### Success Response (200)
+
+**Novi korisnik (sa reset_url linkom):**
 ```json
 {
   "success": true,
   "message": "Faktura je poslata na user@example.com.",
-  "user_created": true
+  "user_created": true,
+  "reset_url": "https://app.pausalci.com/admin/password-reset/reset?token=47cea6b1ab3461030c4910c6c164b4551f724a90922a985858c7bac17a107fe3&email=user%40example.com"
 }
 ```
+
+**Postojeći korisnik:**
+```json
+{
+  "success": true,
+  "message": "Faktura je poslata na user@example.com.",
+  "user_created": false
+}
+```
+
+**Napomena:** `reset_url` se vraća samo za nove korisnike (`user_created: true`) i može se koristiti za direktno preusmeravanje korisnika na stranicu za postavljanje lozinke.
 
 ### Validation Error (422)
 ```json

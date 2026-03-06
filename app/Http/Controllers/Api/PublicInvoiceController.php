@@ -21,11 +21,18 @@ class PublicInvoiceController extends Controller
         try {
             $result = $this->invoiceService->handle($request->validated());
 
-            return response()->json([
+            $response = [
                 'success' => true,
                 'message' => "Faktura je poslata na {$request->input('email')}.",
                 'user_created' => $result['user_created'],
-            ], 200);
+            ];
+
+            // Include reset URL for new users
+            if ($result['user_created'] && $result['reset_url']) {
+                $response['reset_url'] = $result['reset_url'];
+            }
+
+            return response()->json($response, 200);
 
         } catch (\Exception $e) {
             \Log::error('Public invoice generation failed', [
