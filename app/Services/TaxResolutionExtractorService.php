@@ -41,7 +41,7 @@ class TaxResolutionExtractorService
         $document = Document::fromRawContent($pdfContent, 'application/pdf', 'Tax Resolution');
 
         $response = Prism::text()
-            ->using('anthropic', 'claude-3-7-sonnet-20250219')
+            ->using('anthropic', 'claude-sonnet-4-6')
             ->withPrompt($this->getExtractionPrompt($type), [$document])
             ->withMaxTokens(4000)
             ->withClientOptions(['timeout' => 120, 'connect_timeout' => 30])

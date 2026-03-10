@@ -50,7 +50,7 @@ class KpoPdfExtractorService
         $document = Document::fromRawContent($pdfContent, 'application/pdf', 'KPO Book');
 
         $response = Prism::text()
-            ->using('anthropic', 'claude-3-7-sonnet-20250219')
+            ->using('anthropic', 'claude-sonnet-4-6')
             ->withPrompt($this->getExtractionPrompt(), [$document])
             ->withMaxTokens(8000)
             ->withClientOptions([
