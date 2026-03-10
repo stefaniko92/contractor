@@ -48,12 +48,14 @@ class IpsQrCodeService
             $parts[] = 'S:' . $this->sanitizeText($data['purpose'], 35);
         }
 
-        // RO: Model + poziv na broj (opciono)
-        if (!empty($data['model']) && !empty($data['reference_number'])) {
-            $model = $this->formatModel($data['model']);              // npr. "97"
-            $ref   = $this->formatReferenceNumber($data['reference_number']); // samo cifre
-            $parts[] = 'RO:' . $model . $ref;                         // npr. "971234567890..."
-        }
+        // RO: Model + poziv na broj (opciono) - NAMERNO ISKLJUČENO
+        // NBS ne prihvata model 97 bez validnog kontrolnog broja
+        // Ako je potreban poziv na broj, mora se implementirati validacija po modulu 97
+        // if (!empty($data['model']) && !empty($data['reference_number'])) {
+        //     $model = $this->formatModel($data['model']);
+        //     $ref   = $this->formatReferenceNumber($data['reference_number']);
+        //     $parts[] = 'RO:' . $model . $ref;
+        // }
 
         // P: Platilac (opciono; ako ga nema, tag se uopšte NE dodaje)
         if (!empty($data['payer_name'])) {
@@ -114,12 +116,12 @@ class IpsQrCodeService
     }
 
     /**
-     * I: RSD + iznos sa tačkom i dve decimale
-     * Primer: 15885.64 -> "RSD15885.64"
+     * I: RSD + iznos sa zarezom i dve decimale (bez hiljadnih separatora)
+     * Primer: 15885.64 -> "RSD15885,64"
      */
     private function formatAmount(float $amount): string
     {
-        return 'RSD' . number_format($amount, 2, '.', '');
+        return 'RSD' . number_format($amount, 2, ',', '');
     }
 
     /**
