@@ -114,22 +114,49 @@ class IpsQrCodeService
     }
 
     /**
-     * I: RSD + iznos sa zarezom i dve decimale
-     * Primer: 15885.64 -> "RSD15885,64"
+     * I: RSD + iznos sa tačkom i dve decimale
+     * Primer: 15885.64 -> "RSD15885.64"
      */
     private function formatAmount(float $amount): string
     {
-        return 'RSD' . number_format($amount, 2, ',', '');
+        return 'RSD' . number_format($amount, 2, '.', '');
     }
 
     /**
-     * Sanira tekst za tagove N, S, P – skida '|' i seče na max dužinu.
+     * Sanira tekst za tagove N, S, P – skida '|', zareze, i dijakritičke znakove, seče na max dužinu.
      */
     private function sanitizeText(string $text, int $limit): string
     {
         $text = trim($text);
-        $text = str_replace('|', ' ', $text); // '|' ne sme ući u payload
+
+        // Ukloni dijakritičke znakove (ćčšđžĆČŠĐŽ -> ccsdzCCSDZ)
+        $text = $this->removeDiacritics($text);
+
+        // Ukloni pipe i zareze
+        $text = str_replace(['|', ','], ' ', $text);
+
+        // Ukloni višestruke razmake
+        $text = preg_replace('/\s+/', ' ', $text);
+
+        $text = trim($text);
+
         return mb_substr($text, 0, $limit, 'UTF-8');
+    }
+
+    /**
+     * Uklanja dijakritičke znakove iz teksta za NBS IPS format
+     */
+    private function removeDiacritics(string $text): string
+    {
+        $replacements = [
+            'Š' => 'S', 'š' => 's',
+            'Đ' => 'D', 'đ' => 'd',
+            'Ž' => 'Z', 'ž' => 'z',
+            'Ć' => 'C', 'ć' => 'c',
+            'Č' => 'C', 'č' => 'c',
+        ];
+
+        return str_replace(array_keys($replacements), array_values($replacements), $text);
     }
 
     /**
