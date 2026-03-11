@@ -39,7 +39,25 @@ class InvoicesTable
                 TextColumn::make('invoice_number')
                     ->label('Broj fakture')
                     ->searchable()
-                    ->sortable()
+                    ->sortable(query: function ($query, $direction) {
+                        // Custom sort for invoice numbers in format "n/year"
+                        // Works with SQLite: sort by year DESC, then by number DESC
+                        $db = config('database.default');
+
+                        if ($db === 'sqlite') {
+                            // SQLite version
+                            return $query->orderByRaw("
+                                CAST(SUBSTR(invoice_number, INSTR(invoice_number, '/') + 1) AS INTEGER) {$direction},
+                                CAST(SUBSTR(invoice_number, 1, INSTR(invoice_number, '/') - 1) AS INTEGER) {$direction}
+                            ");
+                        } else {
+                            // MySQL/PostgreSQL version
+                            return $query->orderByRaw("
+                                CAST(SUBSTRING_INDEX(invoice_number, '/', -1) AS UNSIGNED) {$direction},
+                                CAST(SUBSTRING_INDEX(invoice_number, '/', 1) AS UNSIGNED) {$direction}
+                            ");
+                        }
+                    })
                     ->formatStateUsing(function ($state, $record) {
                         if ($record->is_storno) {
                             return $state.' (STORNO)';
@@ -195,7 +213,7 @@ class InvoicesTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->defaultSort('created_at', 'desc')
+            ->defaultSort('invoice_number', 'desc')
             ->filters([
                 SelectFilter::make('status')
                     ->label('Status')
