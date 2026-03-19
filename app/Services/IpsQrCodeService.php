@@ -48,14 +48,12 @@ class IpsQrCodeService
             $parts[] = 'S:' . $this->sanitizeText($data['purpose'], 35);
         }
 
-        // RO: Model + poziv na broj (opciono) - NAMERNO ISKLJUČENO
-        // NBS ne prihvata model 97 bez validnog kontrolnog broja
-        // Ako je potreban poziv na broj, mora se implementirati validacija po modulu 97
-        // if (!empty($data['model']) && !empty($data['reference_number'])) {
-        //     $model = $this->formatModel($data['model']);
-        //     $ref   = $this->formatReferenceNumber($data['reference_number']);
-        //     $parts[] = 'RO:' . $model . $ref;
-        // }
+        // RO: Model + poziv na broj (opciono)
+        if (!empty($data['model']) && !empty($data['reference_number'])) {
+            $model = $this->formatModel($data['model']);
+            $ref   = $this->formatReferenceNumber($data['reference_number']);
+            $parts[] = 'RO:' . $model . $ref;
+        }
 
         // P: Platilac (opciono; ako ga nema, tag se uopšte NE dodaje)
         if (!empty($data['payer_name'])) {
