@@ -312,6 +312,24 @@ class InvoicesTable
                             ->send();
                     }),
 
+                Action::make('mark_as_sent')
+                    ->label('Označi kao poslatu')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->color('info')
+                    ->visible(fn ($record) => ! $record->is_storno && $record->status !== 'sent')
+                    ->requiresConfirmation()
+                    ->modalHeading('Označi fakturu kao poslatu')
+                    ->modalDescription(fn ($record) => "Da li ste sigurni da želite da označite fakturu {$record->invoice_number} kao poslatu?")
+                    ->action(function ($record) {
+                        $record->update(['status' => 'sent']);
+
+                        Notification::make()
+                            ->title('Faktura je označena kao poslata')
+                            ->body("Status fakture {$record->invoice_number} je uspešno promenjen u \"Poslana\".")
+                            ->success()
+                            ->send();
+                    }),
+
                 ActionGroup::make([
                     EditAction::make()
                         ->label('Uredi')
@@ -408,12 +426,18 @@ class InvoicesTable
                         ->label('Pošalji')
                         ->icon('heroicon-o-paper-airplane')
                         ->color('info')
-                        ->visible(function ($record) {
-                            // Don't show send action for storno invoices
-                            return ! $record->is_storno;
-                        })
-                        ->action(function () {
-                            // TODO: Implement send functionality
+                        ->visible(fn ($record) => ! $record->is_storno && $record->status !== 'sent')
+                        ->requiresConfirmation()
+                        ->modalHeading('Označi fakturu kao poslatu')
+                        ->modalDescription(fn ($record) => "Da li ste sigurni da želite da označite fakturu {$record->invoice_number} kao poslatu?")
+                        ->action(function ($record) {
+                            $record->update(['status' => 'sent']);
+
+                            Notification::make()
+                                ->title('Faktura je označena kao poslata')
+                                ->body("Status fakture {$record->invoice_number} je uspešno promenjen u \"Poslana\".")
+                                ->success()
+                                ->send();
                         }),
 
                     Action::make('send_to_efaktura')
@@ -699,6 +723,32 @@ class InvoicesTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    BulkAction::make('mark_as_sent')
+                        ->label('Označi kao poslate')
+                        ->icon('heroicon-o-paper-airplane')
+                        ->color('info')
+                        ->requiresConfirmation()
+                        ->modalHeading('Označi fakture kao poslate')
+                        ->modalDescription('Sve izabrane fakture koje nisu storno biće označene kao poslate.')
+                        ->modalSubmitActionLabel('Označi kao poslate')
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records): void {
+                            $count = 0;
+
+                            foreach ($records as $record) {
+                                if (! $record->is_storno && $record->status !== 'sent') {
+                                    $record->update(['status' => 'sent']);
+                                    $count++;
+                                }
+                            }
+
+                            Notification::make()
+                                ->title('Fakture označene kao poslate')
+                                ->body("Uspešno je označeno {$count} faktura/e kao poslato.")
+                                ->success()
+                                ->send();
+                        }),
+
                     BulkAction::make('mark_as_paid')
                         ->label('Označi kao plaćeno')
                         ->icon('heroicon-o-check-circle')

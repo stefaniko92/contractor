@@ -35,6 +35,24 @@ class EditInvoice extends EditRecord
                 ->url(fn () => route('invoices.download', $this->record))
                 ->openUrlInNewTab(),
 
+            Action::make('mark_as_sent')
+                ->label('Označi kao poslatu')
+                ->icon('heroicon-o-paper-airplane')
+                ->color('info')
+                ->requiresConfirmation()
+                ->modalHeading('Označi fakturu kao poslatu')
+                ->modalDescription(fn () => "Da li ste sigurni da želite da označite fakturu {$this->record->invoice_number} kao poslatu?")
+                ->visible(fn () => ! $this->record->is_storno && $this->record->status !== 'sent')
+                ->action(function () {
+                    $this->record->update(['status' => 'sent']);
+
+                    Notification::make()
+                        ->title('Faktura je označena kao poslata')
+                        ->body("Status fakture {$this->record->invoice_number} je uspešno promenjen u \"Poslana\".")
+                        ->success()
+                        ->send();
+                }),
+
             DeleteAction::make(),
         ];
     }
@@ -87,7 +105,7 @@ class EditInvoice extends EditRecord
                 ->label('Unesi plaćanje')
                 ->icon('heroicon-o-currency-dollar')
                 ->color('success')
-                ->visible(fn () => !$this->record->is_storno)
+                ->visible(fn () => ! $this->record->is_storno)
                 ->form([
                     DatePicker::make('payment_date')
                         ->label('Datum plaćanja')
@@ -98,7 +116,7 @@ class EditInvoice extends EditRecord
                         ->numeric()
                         ->step(0.01)
                         ->required()
-                        ->helperText(fn () => 'Ukupan iznos fakture: ' . number_format($this->record->amount, 2) . ' ' . $this->record->currency),
+                        ->helperText(fn () => 'Ukupan iznos fakture: '.number_format($this->record->amount, 2).' '.$this->record->currency),
                 ])
                 ->fillForm(fn () => [
                     'payment_date' => now(),
@@ -118,7 +136,7 @@ class EditInvoice extends EditRecord
 
                     Notification::make()
                         ->title('Plaćanje zabeleženo')
-                        ->body('Plaćanje od ' . number_format($paymentAmount, 2) . ' ' . $this->record->currency . " je uspešno zabeleženo za fakturu {$this->record->invoice_number}. " . $statusMessage)
+                        ->body('Plaćanje od '.number_format($paymentAmount, 2).' '.$this->record->currency." je uspešno zabeleženo za fakturu {$this->record->invoice_number}. ".$statusMessage)
                         ->success()
                         ->send();
                 }),
@@ -128,7 +146,7 @@ class EditInvoice extends EditRecord
                 ->icon('heroicon-o-document-duplicate')
                 ->color('gray')
                 ->action(fn () => redirect()->to(
-                    '/admin/create-invoice-page?' . http_build_query([
+                    '/admin/create-invoice-page?'.http_build_query([
                         'copy_from_invoice' => $this->record->id,
                     ])
                 )),
@@ -142,7 +160,7 @@ class EditInvoice extends EditRecord
                 ->modalDescription(fn () => "Da li ste sigurni da želite da stornirate fakturu {$this->record->invoice_number}? Biće kreirana nova storno faktura sa negativnim iznosima u skladu sa srpskim zakonskim propisima. Obe fakture će biti zabeležene u knjizi prihoda.")
                 ->modalSubmitActionLabel('Storniraj')
                 ->modalIcon('heroicon-o-exclamation-triangle')
-                ->visible(fn () => !$this->record->is_storno && $this->record->status !== 'in_preparation' && $this->record->stornoInvoices()->count() === 0)
+                ->visible(fn () => ! $this->record->is_storno && $this->record->status !== 'in_preparation' && $this->record->stornoInvoices()->count() === 0)
                 ->action(function () {
                     $stornoInvoice = \App\Models\Invoice::create([
                         'user_id' => $this->record->user_id,
@@ -153,7 +171,7 @@ class EditInvoice extends EditRecord
                         'due_date' => now()->addDays(30),
                         'trading_place' => $this->record->trading_place,
                         'currency' => $this->record->currency,
-                        'description' => 'Storno fakture ' . $this->record->invoice_number . ' od ' . $this->record->issue_date->format('d.m.Y'),
+                        'description' => 'Storno fakture '.$this->record->invoice_number.' od '.$this->record->issue_date->format('d.m.Y'),
                         'status' => 'storned',
                         'amount' => -$this->record->amount,
                         'is_storno' => true,
@@ -166,7 +184,7 @@ class EditInvoice extends EditRecord
                         InvoiceItem::create([
                             'invoice_id' => $stornoInvoice->id,
                             'title' => $item->title,
-                            'description' => 'Storno: ' . $item->description,
+                            'description' => 'Storno: '.$item->description,
                             'type' => $item->type,
                             'unit' => $item->unit,
                             'quantity' => $item->quantity,
@@ -212,7 +230,7 @@ class EditInvoice extends EditRecord
                 ->modalCancelActionLabel('Ne')
                 ->modalIcon('heroicon-o-envelope')
                 ->modalWidth(FilamentHelper::getModalSizeForContext('efaktura_modal'))
-                ->visible(fn () => !$this->record->is_storno && $this->record->efakturaInvoice === null)
+                ->visible(fn () => ! $this->record->is_storno && $this->record->efakturaInvoice === null)
                 ->action(function (array $data) {
                     $dueDate = $data['due_date'] ?? now()->addDays(30);
 
@@ -223,7 +241,7 @@ class EditInvoice extends EditRecord
                     $sefService = SefService::forAuthenticatedUser();
                     $availabilityStatus = $sefService->getAvailabilityStatus();
 
-                    if (!$availabilityStatus['available']) {
+                    if (! $availabilityStatus['available']) {
                         Notification::make()
                             ->title('SEF nije dostupan')
                             ->body($availabilityStatus['message'])
@@ -239,7 +257,7 @@ class EditInvoice extends EditRecord
                         return;
                     }
 
-                    if (!$this->record->client->efaktura_verified) {
+                    if (! $this->record->client->efaktura_verified) {
                         Notification::make()
                             ->title('Klijent nije verifikovan')
                             ->body('Klijent još nije proverен u eFaktura sistemu. Molimo sačekajte automatsku verifikaciju ili pokrenite komandu ručno.')
@@ -338,7 +356,7 @@ class EditInvoice extends EditRecord
 
                         Notification::make()
                             ->title('eFaktura uspešno poslata')
-                            ->body("Faktura {$this->record->invoice_number} je uspešno poslata na eFaktura sistem. Datum dospeća: " . (is_string($dueDate) ? $dueDate : $dueDate->format('d.m.Y')) . '.')
+                            ->body("Faktura {$this->record->invoice_number} je uspešno poslata na eFaktura sistem. Datum dospeća: ".(is_string($dueDate) ? $dueDate : $dueDate->format('d.m.Y')).'.')
                             ->success()
                             ->send();
 
@@ -376,7 +394,7 @@ class EditInvoice extends EditRecord
                 ->action(function () {
                     $efakturaInvoice = $this->record->efakturaInvoice;
 
-                    if (!$efakturaInvoice) {
+                    if (! $efakturaInvoice) {
                         Notification::make()
                             ->title('Greška')
                             ->body('Ova faktura nije poslata na eFaktura sistem.')

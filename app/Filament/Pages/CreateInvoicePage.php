@@ -31,6 +31,31 @@ class CreateInvoicePage extends Page implements HasForms
 {
     use InteractsWithForms;
 
+    protected function getPrimaryBankAccountIdForCurrency(?string $currency): ?int
+    {
+        if (blank($currency) || ! Auth::check()) {
+            return null;
+        }
+
+        return BankAccount::query()
+            ->whereHas('userCompany', function ($query): void {
+                $query->where('user_id', Auth::id());
+            })
+            ->where('currency', $currency)
+            ->where('is_primary', true)
+            ->value('id');
+    }
+
+    protected function applyDefaultBankAccountSelection(): void
+    {
+        if (! empty($this->data['bank_account_id'])) {
+            return;
+        }
+
+        $currency = $this->data['currency'] ?? 'RSD';
+        $this->data['bank_account_id'] = $this->getPrimaryBankAccountIdForCurrency($currency);
+    }
+
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-document-plus';
 
     protected string $view = 'filament.pages.create-invoice-page';
@@ -94,6 +119,7 @@ class CreateInvoicePage extends Page implements HasForms
             'currency' => 'RSD',
             'description' => null,
             'status' => 'in_preparation',
+            'bank_account_id' => null,
             'invoice_items' => [
                 [
                     'type' => 'service',
@@ -124,6 +150,7 @@ class CreateInvoicePage extends Page implements HasForms
                     'currency' => $sourceInvoice->currency,
                     'description' => $sourceInvoice->description,
                     'status' => 'in_preparation',
+                    'bank_account_id' => $sourceInvoice->bank_account_id,
                     'invoice_items' => $sourceInvoice->items->map(function ($item) {
                         return [
                             'type' => $item->type,
@@ -175,6 +202,7 @@ class CreateInvoicePage extends Page implements HasForms
                     'currency' => $profaktura->currency,
                     'description' => 'Faktura na osnovu profakture '.$profaktura->invoice_number.' od '.$profaktura->issue_date->format('d.m.Y'),
                     'status' => 'in_preparation',
+                    'bank_account_id' => $profaktura->bank_account_id,
                     'invoice_items' => $profaktura->items->map(function ($item) {
                         return [
                             'type' => $item->type,
@@ -201,6 +229,8 @@ class CreateInvoicePage extends Page implements HasForms
                     ->send();
             }
         }
+
+        $this->applyDefaultBankAccountSelection();
     }
 
     protected function getFormSchema(): array
@@ -251,15 +281,10 @@ class CreateInvoicePage extends Page implements HasForms
                                     $set('currency', $client->currency);
 
                                     // Auto-select primary bank account for this currency
-                                    $primaryAccount = BankAccount::whereHas('userCompany', function ($query) {
-                                        $query->where('user_id', Auth::id());
-                                    })
-                                        ->where('currency', $client->currency)
-                                        ->where('is_primary', true)
-                                        ->first();
+                                    $primaryBankAccountId = $this->getPrimaryBankAccountIdForCurrency($client->currency);
 
-                                    if ($primaryAccount) {
-                                        $set('bank_account_id', $primaryAccount->id);
+                                    if ($primaryBankAccountId) {
+                                        $set('bank_account_id', $primaryBankAccountId);
                                     }
                                 }
                             }
@@ -500,17 +525,11 @@ class CreateInvoicePage extends Page implements HasForms
                             $this->recalculateAllTotals();
 
                             // Auto-select primary bank account for new currency
-                            $primaryAccount = BankAccount::whereHas('userCompany', function ($query) {
-                                $query->where('user_id', Auth::id());
-                            })
-                                ->where('currency', $state)
-                                ->where('is_primary', true)
-                                ->first();
+                            $primaryBankAccountId = $this->getPrimaryBankAccountIdForCurrency($state);
 
-                            if ($primaryAccount) {
-                                $set('bank_account_id', $primaryAccount->id);
+                            if ($primaryBankAccountId) {
+                                $set('bank_account_id', $primaryBankAccountId);
                             } else {
-                                // Clear bank account if no matching currency
                                 $set('bank_account_id', null);
                             }
                         }),
@@ -556,6 +575,17 @@ class CreateInvoicePage extends Page implements HasForms
                             return "Prikazani su samo računi u valuti: {$currency}";
                         })
                         ->live()
+                        ->afterStateHydrated(function ($state, $set, $get) {
+                            if (filled($state)) {
+                                return;
+                            }
+
+                            $primaryBankAccountId = $this->getPrimaryBankAccountIdForCurrency($get('currency') ?? 'RSD');
+
+                            if ($primaryBankAccountId) {
+                                $set('bank_account_id', $primaryBankAccountId);
+                            }
+                        })
                         ->columnSpanFull(),
 
                     Textarea::make('description')

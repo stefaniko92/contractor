@@ -18,6 +18,21 @@ use Illuminate\Support\Facades\Auth;
 
 class InvoiceForm
 {
+    protected static function getPrimaryBankAccountIdForCurrency(?string $currency): ?int
+    {
+        if (blank($currency) || ! Auth::check()) {
+            return null;
+        }
+
+        return BankAccount::query()
+            ->whereHas('userCompany', function ($query): void {
+                $query->where('user_id', Auth::id());
+            })
+            ->where('currency', $currency)
+            ->where('is_primary', true)
+            ->value('id');
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -73,17 +88,11 @@ class InvoiceForm
                                                 $set('currency', $newCurrency);
 
                                                 // Auto-select primary bank account for the new currency
-                                                $primaryAccount = BankAccount::whereHas('userCompany', function ($query) {
-                                                    $query->where('user_id', Auth::id());
-                                                })
-                                                    ->where('currency', $newCurrency)
-                                                    ->where('is_primary', true)
-                                                    ->first();
+                                                $primaryBankAccountId = self::getPrimaryBankAccountIdForCurrency($newCurrency);
 
-                                                if ($primaryAccount) {
-                                                    $set('bank_account_id', $primaryAccount->id);
+                                                if ($primaryBankAccountId) {
+                                                    $set('bank_account_id', $primaryBankAccountId);
                                                 } else {
-                                                    // Clear bank account if no matching currency
                                                     $set('bank_account_id', null);
                                                 }
                                             }
@@ -130,18 +139,11 @@ class InvoiceForm
                                     ->required()
                                     ->live()
                                     ->afterStateUpdated(function ($state, $set) {
-                                        // Auto-select primary bank account for new currency
-                                        $primaryAccount = BankAccount::whereHas('userCompany', function ($query) {
-                                            $query->where('user_id', Auth::id());
-                                        })
-                                            ->where('currency', $state)
-                                            ->where('is_primary', true)
-                                            ->first();
+                                        $primaryBankAccountId = self::getPrimaryBankAccountIdForCurrency($state);
 
-                                        if ($primaryAccount) {
-                                            $set('bank_account_id', $primaryAccount->id);
+                                        if ($primaryBankAccountId) {
+                                            $set('bank_account_id', $primaryBankAccountId);
                                         } else {
-                                            // Clear bank account if no matching currency
                                             $set('bank_account_id', null);
                                         }
                                     })
@@ -214,20 +216,17 @@ class InvoiceForm
                                         return "Prikazani su samo računi u valuti: {$currency}";
                                     })
                                     ->live()
-                                    ->default(function ($record) {
-                                        // If editing and no bank account set, auto-select primary for this currency
-                                        if ($record && ! $record->bank_account_id && $record->currency) {
-                                            $primaryAccount = BankAccount::whereHas('userCompany', function ($query) {
-                                                $query->where('user_id', Auth::id());
-                                            })
-                                                ->where('currency', $record->currency)
-                                                ->where('is_primary', true)
-                                                ->first();
-
-                                            return $primaryAccount?->id;
+                                    ->afterStateHydrated(function ($state, $set, $get, $record) {
+                                        if (filled($state)) {
+                                            return;
                                         }
 
-                                        return null;
+                                        $currency = $get('currency') ?? $record?->currency ?? 'RSD';
+                                        $primaryBankAccountId = self::getPrimaryBankAccountIdForCurrency($currency);
+
+                                        if ($primaryBankAccountId) {
+                                            $set('bank_account_id', $primaryBankAccountId);
+                                        }
                                     })
                                     ->columnSpanFull(),
 
