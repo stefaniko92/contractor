@@ -22,6 +22,9 @@ class InvoicePdfController extends Controller
             abort(403);
         }
 
+        // Refresh invoice from database to get latest data
+        $invoice->refresh();
+
         // Load relationships
         $invoice->load(['client', 'items', 'user.userCompany.companyOwner', 'bankAccount']);
 
@@ -37,6 +40,9 @@ class InvoicePdfController extends Controller
         if ($invoice->user_id !== Auth::id()) {
             abort(403);
         }
+
+        // Refresh invoice from database to get latest data
+        $invoice->refresh();
 
         // Load relationships
         $invoice->load(['client', 'items', 'user.userCompany.companyOwner', 'bankAccount']);
@@ -128,6 +134,9 @@ class InvoicePdfController extends Controller
         if ($invoice->user_id !== Auth::id()) {
             abort(403);
         }
+
+        // Refresh invoice from database to get latest data
+        $invoice->refresh();
 
         // Load relationships
         $invoice->load(['client', 'items', 'user.userCompany.companyOwner', 'bankAccount']);

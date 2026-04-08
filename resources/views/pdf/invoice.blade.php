@@ -545,7 +545,7 @@
                 $itemFinalTotal = $itemTotal - $itemDiscount;
             @endphp
             <tr>
-                <td>{{ $item->description ?? $item->title }}</td>
+                <td>{{ $item->title }}</td>
                 <td>{{ $item->unit }}</td>
                 <td class="text-right">{{ number_format($item->quantity, 2) }}</td>
                 <td class="text-right">{{ number_format($item->unit_price, 2) }}</td>
