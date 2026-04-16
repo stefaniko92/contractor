@@ -31,35 +31,35 @@ class IpsQrCodeService
         $parts[] = 'C:1';
 
         // R: Račun primaoca – TAČNO 18 cifara, bez crtice
-        $parts[] = 'R:' . $this->formatAccountNumber($data['recipient_account']);
+        $parts[] = 'R:'.$this->formatAccountNumber($data['recipient_account']);
 
         // N: Naziv primaoca (max 70)
-        $parts[] = 'N:' . $this->sanitizeText($data['recipient_name'], 70);
+        $parts[] = 'N:'.$this->sanitizeText($data['recipient_name'], 70);
 
         // I: Iznos – RSD####,##
-        $parts[] = 'I:' . $this->formatAmount($data['amount']);
+        $parts[] = 'I:'.$this->formatAmount($data['amount']);
 
         // SF: Šifra plaćanja (npr. 289 ili 253)
         $paymentCode = $data['payment_code'] ?? '289';
-        $parts[] = 'SF:' . $paymentCode;
+        $parts[] = 'SF:'.$paymentCode;
 
         // S: Svrha plaćanja (opciono, max 35)
-        if (!empty($data['purpose'])) {
-            $parts[] = 'S:' . $this->sanitizeText($data['purpose'], 35);
+        if (! empty($data['purpose'])) {
+            $parts[] = 'S:'.$this->sanitizeText($data['purpose'], 35);
         }
 
         // RO: Model + poziv na broj (opciono)
-        if (!empty($data['model']) && !empty($data['reference_number'])) {
+        if (! empty($data['model']) && ! empty($data['reference_number'])) {
             $model = $this->formatModel($data['model']);
-            $ref   = $this->formatReferenceNumber($data['reference_number']);
-            $parts[] = 'RO:' . $model . $ref;
+            $ref = $this->formatReferenceNumber($data['reference_number'], $model);
+            $parts[] = 'RO:'.$model.$ref;
         }
 
         // P: Platilac (opciono; ako ga nema, tag se uopšte NE dodaje)
-        if (!empty($data['payer_name'])) {
+        if (! empty($data['payer_name'])) {
             // Ako hoćeš i adresu: spoji ime + adresu sa "\r\n"
             $payer = $this->sanitizeText($data['payer_name'], 70);
-            $parts[] = 'P:' . $payer;
+            $parts[] = 'P:'.$payer;
         }
 
         // Važno: string se NE sme završavati sa '|'
@@ -77,8 +77,8 @@ class IpsQrCodeService
         $account = preg_replace('/[\s-]/', '', $account);
 
         // mora da sadrži samo cifre
-        if (!ctype_digit($account)) {
-            throw new \Exception("Invalid account number: must contain only digits");
+        if (! ctype_digit($account)) {
+            throw new \Exception('Invalid account number: must contain only digits');
         }
 
         // minimum je 4 cifre (3 za banku + bar 1 za račun),
@@ -86,11 +86,11 @@ class IpsQrCodeService
         $length = strlen($account);
 
         if ($length < 4) {
-            throw new \Exception("Invalid account number: too short to contain bank code + account");
+            throw new \Exception('Invalid account number: too short to contain bank code + account');
         }
 
         if ($length > 18) {
-            throw new \Exception("Invalid account number: longer than 18 digits");
+            throw new \Exception('Invalid account number: longer than 18 digits');
         }
 
         // tačno 18 cifara → već je OK
@@ -100,17 +100,17 @@ class IpsQrCodeService
 
         // manje od 18 → dopunjuj deo posle prve 3 cifre nulama s LEVE strane
         $bankCode = substr($account, 0, 3);
-        $rest     = substr($account, 3);
+        $rest = substr($account, 3);
 
         if (strlen($rest) > 15) {
             // teoretski ne bi trebalo da se desi, ali čisto radi sigurnosti
-            throw new \Exception("Invalid account number: account part longer than 15 digits");
+            throw new \Exception('Invalid account number: account part longer than 15 digits');
         }
 
         // dopuni deo računa na 15 cifara nulama S LEVE STRANE
         $restPadded = str_pad($rest, 15, '0', STR_PAD_LEFT);
 
-        return $bankCode . $restPadded;
+        return $bankCode.$restPadded;
     }
 
     /**
@@ -119,7 +119,7 @@ class IpsQrCodeService
      */
     private function formatAmount(float $amount): string
     {
-        return 'RSD' . number_format($amount, 2, ',', '');
+        return 'RSD'.number_format($amount, 2, ',', '');
     }
 
     /**
@@ -165,14 +165,60 @@ class IpsQrCodeService
     private function formatModel(string $model): string
     {
         $model = preg_replace('/\D/', '', $model);
+
         return str_pad($model, 2, '0', STR_PAD_LEFT);
     }
 
     /**
      * Poziv na broj – samo cifre (bez '-', '/', ' ')
      */
-    private function formatReferenceNumber(string $reference): string
+    private function formatReferenceNumber(string $reference, ?string $model = null): string
     {
-        return preg_replace('/\D/', '', $reference);
+        $reference = preg_replace('/\D/', '', $reference);
+
+        if ($model !== '97' || $reference === '') {
+            return $reference;
+        }
+
+        if ($this->isValidModel97Reference($reference)) {
+            return $reference;
+        }
+
+        return $this->calculateModel97ControlNumber($reference).$reference;
+    }
+
+    private function isValidModel97Reference(string $reference): bool
+    {
+        if (strlen($reference) < 3) {
+            return false;
+        }
+
+        $controlNumber = substr($reference, 0, 2);
+        $body = substr($reference, 2);
+
+        return $controlNumber === $this->calculateModel97ControlNumber($body);
+    }
+
+    private function calculateModel97ControlNumber(string $reference): string
+    {
+        $remainder = $this->calculateModulo97($reference.'00');
+        $controlNumber = 98 - $remainder;
+
+        if ($controlNumber === 98) {
+            $controlNumber = 0;
+        }
+
+        return str_pad((string) $controlNumber, 2, '0', STR_PAD_LEFT);
+    }
+
+    private function calculateModulo97(string $value): int
+    {
+        $remainder = 0;
+
+        foreach (str_split($value) as $digit) {
+            $remainder = (($remainder * 10) + (int) $digit) % 97;
+        }
+
+        return $remainder;
     }
 }
