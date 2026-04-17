@@ -24,6 +24,11 @@ class Client extends Model
         'vat_number',
         'registration_number',
         'currency',
+        'efaktura_verified',
+        'efaktura_verified_at',
+        'efaktura_status',
+        'efaktura_verification_error',
+        'allow_efaktura_bypass',
     ];
 
     protected $casts = [

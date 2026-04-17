@@ -5,10 +5,12 @@ namespace App\Filament\Resources\Clients\Schemas;
 use App\Services\PibLookupService;
 use Filament\Actions\Action as FormAction;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
@@ -168,6 +170,42 @@ class ClientForm
                             ->columns(2)
                             ->columnSpanFull()
                             ->visible(fn ($get) => ! $get('is_domestic')),
+                        Section::make('eFaktura Status')
+                            ->schema([
+                                Placeholder::make('efaktura_status_display')
+                                    ->label('Status verifikacije')
+                                    ->content(function ($record) {
+                                        if (! $record) {
+                                            return 'Nije provereno';
+                                        }
+
+                                        return match ($record->efaktura_status) {
+                                            'active' => '✅ Verifikovan - Klijent postoji u eFaktura sistemu',
+                                            'not_found' => '⚠️ Nije pronađen u eFaktura sistemu',
+                                            'error' => '❌ Greška pri verifikaciji',
+                                            default => '⏳ Nije provereno - Kliknite "Proveri u eFaktura" dugme gore',
+                                        };
+                                    }),
+
+                                Placeholder::make('efaktura_verified_at')
+                                    ->label('Poslednja provera')
+                                    ->content(fn ($record) => $record?->efaktura_verified_at?->format('d.m.Y H:i') ?? 'Nikada')
+                                    ->visible(fn ($record) => $record?->efaktura_verified_at),
+
+                                Placeholder::make('efaktura_verification_error')
+                                    ->label('Greška')
+                                    ->content(fn ($record) => $record?->efaktura_verification_error)
+                                    ->visible(fn ($record) => ! empty($record?->efaktura_verification_error)),
+
+                                Toggle::make('allow_efaktura_bypass')
+                                    ->label('Dozvoli slanje bez verifikacije')
+                                    ->helperText('Omogućite ovu opciju ako želite da šaljete fakture ovom klijentu iako nije pronađen u eFaktura sistemu. Koristite samo ako ste sigurni da klijent postoji u SEF sistemu.')
+                                    ->visible(fn ($record) => $record?->efaktura_status !== 'active'),
+                            ])
+                            ->columns(1)
+                            ->columnSpanFull()
+                            ->visible(fn ($get) => $get('is_domestic') && ! empty($get('tax_id'))),
+
                         Section::make('Dodatne informacije')
                             ->schema([
                                 Textarea::make('notes')

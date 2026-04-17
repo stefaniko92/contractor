@@ -503,8 +503,8 @@ class InvoicesTable
                                 return;
                             }
 
-                            // Check if client is verified in eFaktura system
-                            if (! $record->client->efaktura_verified) {
+                            // Check if client is verified in eFaktura system or has bypass enabled
+                            if (! $record->client->efaktura_verified && ! $record->client->allow_efaktura_bypass) {
                                 Notification::make()
                                     ->title('Klijent nije verifikovan')
                                     ->body('Klijent još nije proverен u eFaktura sistemu. Molimo sačekajte automatsku verifikaciju ili pokrenite komandu ručno.')
@@ -521,7 +521,7 @@ class InvoicesTable
                                 return;
                             }
 
-                            if ($record->client->efaktura_status !== 'active') {
+                            if ($record->client->efaktura_status !== 'active' && ! $record->client->allow_efaktura_bypass) {
                                 Notification::make()
                                     ->title('Klijent nije pronađen u eFaktura')
                                     ->body('Ovaj klijent ne postoji u eFaktura sistemu. Ne možete poslati fakturu elektronski.')

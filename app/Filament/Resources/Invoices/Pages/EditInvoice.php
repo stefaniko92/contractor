@@ -257,7 +257,8 @@ class EditInvoice extends EditRecord
                         return;
                     }
 
-                    if (! $this->record->client->efaktura_verified) {
+                    // Check if client is verified or has bypass enabled
+                    if (! $this->record->client->efaktura_verified && ! $this->record->client->allow_efaktura_bypass) {
                         Notification::make()
                             ->title('Klijent nije verifikovan')
                             ->body('Klijent još nije proverен u eFaktura sistemu. Molimo sačekajte automatsku verifikaciju ili pokrenite komandu ručno.')
@@ -274,7 +275,7 @@ class EditInvoice extends EditRecord
                         return;
                     }
 
-                    if ($this->record->client->efaktura_status !== 'active') {
+                    if ($this->record->client->efaktura_status !== 'active' && ! $this->record->client->allow_efaktura_bypass) {
                         Notification::make()
                             ->title('Klijent nije pronađen u eFaktura')
                             ->body('Ovaj klijent ne postoji u eFaktura sistemu. Ne možete poslati fakturu elektronski.')
