@@ -33,6 +33,9 @@ class Client extends Model
 
     protected $casts = [
         // Removed 'is_domestic' => 'boolean' cast to work properly with integer radio options
+        'efaktura_verified' => 'boolean',
+        'efaktura_verified_at' => 'datetime',
+        'allow_efaktura_bypass' => 'boolean',
     ];
 
     public function user(): BelongsTo
