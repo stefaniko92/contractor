@@ -85,13 +85,13 @@ class EditInvoice extends EditRecord
     protected function getSaveFormAction(): Action
     {
         return parent::getSaveFormAction()
-            ->label('Sačuvaj');
+            ->label(__('actions.save'));
     }
 
     protected function getCancelFormAction(): Action
     {
         return parent::getCancelFormAction()
-            ->label('Otkaži');
+            ->label(__('actions.cancel'));
     }
 
     protected function getFormActions(): array
@@ -152,13 +152,13 @@ class EditInvoice extends EditRecord
                 )),
 
             Action::make('storno')
-                ->label('Storniraj')
+                ->label(__('actions.storno'))
                 ->icon('heroicon-o-x-mark')
                 ->color('warning')
                 ->requiresConfirmation()
                 ->modalHeading('Storniraj fakturu')
                 ->modalDescription(fn () => "Da li ste sigurni da želite da stornirate fakturu {$this->record->invoice_number}? Biće kreirana nova storno faktura sa negativnim iznosima u skladu sa srpskim zakonskim propisima. Obe fakture će biti zabeležene u knjizi prihoda.")
-                ->modalSubmitActionLabel('Storniraj')
+                ->modalSubmitActionLabel(__('actions.storno'))
                 ->modalIcon('heroicon-o-exclamation-triangle')
                 ->visible(fn () => ! $this->record->is_storno && $this->record->status !== 'in_preparation' && $this->record->stornoInvoices()->count() === 0)
                 ->action(function () {
@@ -226,8 +226,8 @@ class EditInvoice extends EditRecord
                 ->fillForm(fn () => [
                     'due_date' => $this->record->due_date ?? now()->addDays(30),
                 ])
-                ->modalSubmitActionLabel('Da')
-                ->modalCancelActionLabel('Ne')
+                ->modalSubmitActionLabel(__('actions.yes'))
+                ->modalCancelActionLabel(__('actions.no'))
                 ->modalIcon('heroicon-o-envelope')
                 ->modalWidth(FilamentHelper::getModalSizeForContext('efaktura_modal'))
                 ->visible(fn () => ! $this->record->is_storno && $this->record->efakturaInvoice === null)
@@ -308,7 +308,7 @@ class EditInvoice extends EditRecord
                             'xml_length' => strlen($xmlContent),
                         ]);
 
-                        $response = $sefService->sendInvoice($xmlContent, 'SendToCir');
+                        $response = $sefService->sendInvoice($xmlContent, 'Yes');
 
                         if (isset($response['error'])) {
                             \App\Models\EfakturaInvoice::create([
@@ -390,7 +390,7 @@ class EditInvoice extends EditRecord
                 ->requiresConfirmation()
                 ->modalHeading('Osvježi status fakture na eFaktura sistemu')
                 ->modalDescription('Da li želiš da proveriš trenutni status ove fakture na eFaktura portalu?')
-                ->modalSubmitActionLabel('Osvježi')
+                ->modalSubmitActionLabel(__('actions.refresh'))
                 ->action(function () {
                     $efakturaInvoice = $this->record->efakturaInvoice;
 

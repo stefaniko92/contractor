@@ -197,7 +197,7 @@ class AvansnaFakturasTable
                     ->requiresConfirmation()
                     ->modalHeading('Obriši avansnu fakturu')
                     ->modalDescription('Da li ste sigurni da želite da obrišete ovu avansnu fakturu? Ova akcija se ne može poništiti.')
-                    ->modalSubmitActionLabel('Obriši')
+                    ->modalSubmitActionLabel(__('actions.delete'))
                     ->action(function ($record) {
                         $record->delete();
 
@@ -237,7 +237,7 @@ class AvansnaFakturasTable
                         ->modalDescription(function ($record) {
                             return "Da li ste sigurni da želite da stornirate avansnu fakturu {$record->invoice_number}? Biće kreirana nova storno avansna faktura sa negativnim iznosima u skladu sa srpskim zakonskim propisima. Obe avansne fakture će biti zabeležene u knjigi prihoda.";
                         })
-                        ->modalSubmitActionLabel('Storniraj')
+                        ->modalSubmitActionLabel(__('actions.storno'))
                         ->modalIcon('heroicon-o-exclamation-triangle')
                         ->visible(function ($record) {
                             // Only show storno action for issued avansna fakturas that are not storno invoices themselves and don't already have a storno
@@ -312,7 +312,7 @@ class AvansnaFakturasTable
                         ->requiresConfirmation()
                         ->modalHeading('Označi avansne fakture kao plaćene')
                         ->modalDescription('Da li sigurno želite da označite odabrane avansne fakture kao plaćene?')
-                        ->modalSubmitActionLabel('Označi kao plaćeno')
+                        ->modalSubmitActionLabel(__('actions.mark_as_paid'))
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records) {
                             $count = 0;
@@ -335,7 +335,7 @@ class AvansnaFakturasTable
                         ->requiresConfirmation()
                         ->modalHeading('Obriši avansne fakture')
                         ->modalDescription('Da li ste sigurni da želite da obrišete odabrane avansne fakture? Ova akcija se ne može poništiti.')
-                        ->modalSubmitActionLabel('Obriši')
+                        ->modalSubmitActionLabel(__('actions.delete'))
                         ->deselectRecordsAfterCompletion()
                         ->successNotification(
                             Notification::make()

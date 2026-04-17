@@ -368,7 +368,7 @@ class InvoicesTable
                         ->modalDescription(function ($record) {
                             return "Da li ste sigurni da želite da stornirate fakturu {$record->invoice_number}? Biće kreirana nova storno faktura sa negativnim iznosima u skladu sa srpskim zakonskim propisima. Obe fakture će biti zabeležene u knjizi prihoda.";
                         })
-                        ->modalSubmitActionLabel('Storniraj')
+                        ->modalSubmitActionLabel(__('actions.storno'))
                         ->modalIcon('heroicon-o-exclamation-triangle')
                         ->visible(function ($record) {
                             // Only show storno action for issued invoices that are not storno invoices themselves and don't already have a storno
@@ -465,8 +465,8 @@ class InvoicesTable
                                 'due_date' => $record->due_date ?? now()->addDays(30),
                             ];
                         })
-                        ->modalSubmitActionLabel('Da')
-                        ->modalCancelActionLabel('Ne')
+                        ->modalSubmitActionLabel(__('actions.yes'))
+                        ->modalCancelActionLabel(__('actions.no'))
                         ->modalIcon('heroicon-o-envelope')
                         ->modalWidth(FilamentHelper::getModalSizeForContext('efaktura_modal'))
                         ->visible(function ($record) {
@@ -556,7 +556,7 @@ class InvoicesTable
                                     'xml_length' => strlen($xmlContent),
                                 ]);
 
-                                $response = $sefService->sendInvoice($xmlContent, 'SendToCir');
+                                $response = $sefService->sendInvoice($xmlContent, 'Yes');
 
                                 if (isset($response['error'])) {
                                     // Store failed attempt
@@ -643,7 +643,7 @@ class InvoicesTable
                         ->requiresConfirmation()
                         ->modalHeading('Osvježi status fakture na eFaktura sistemu')
                         ->modalDescription('Da li želiš da proveriš trenutni status ove fakture na eFaktura portalu?')
-                        ->modalSubmitActionLabel('Osvježi')
+                        ->modalSubmitActionLabel(__('actions.refresh'))
                         ->action(function ($record) {
                             $efakturaInvoice = $record->efakturaInvoice;
 
@@ -705,7 +705,7 @@ class InvoicesTable
                         ->requiresConfirmation()
                         ->modalHeading('Obriši fakturu')
                         ->modalDescription('Da li ste sigurni da želite da obrišete ovu fakturu? Ova akcija se ne može poništiti.')
-                        ->modalSubmitActionLabel('Obriši')
+                        ->modalSubmitActionLabel(__('actions.delete'))
                         ->action(function ($record) {
                             $record->delete();
 
@@ -730,7 +730,7 @@ class InvoicesTable
                         ->requiresConfirmation()
                         ->modalHeading('Označi fakture kao poslate')
                         ->modalDescription('Sve izabrane fakture koje nisu storno biće označene kao poslate.')
-                        ->modalSubmitActionLabel('Označi kao poslate')
+                        ->modalSubmitActionLabel(__('actions.mark_as_sent'))
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records): void {
                             $count = 0;
@@ -756,7 +756,7 @@ class InvoicesTable
                         ->requiresConfirmation()
                         ->modalHeading('Označi fakture kao plaćene')
                         ->modalDescription('Da li sigurno želite da označite odabrane fakture kao plaćene? Datum fakture će biti korišćen kao datum plaćanja.')
-                        ->modalSubmitActionLabel('Označi kao plaćeno')
+                        ->modalSubmitActionLabel(__('actions.mark_as_paid'))
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records) {
                             $count = 0;
@@ -779,7 +779,7 @@ class InvoicesTable
                         ->requiresConfirmation()
                         ->modalHeading('Obriši fakture')
                         ->modalDescription('Da li ste sigurni da želite da obrišete odabrane fakture? Ova akcija se ne može poništiti.')
-                        ->modalSubmitActionLabel('Obriši')
+                        ->modalSubmitActionLabel(__('actions.delete'))
                         ->deselectRecordsAfterCompletion()
                         ->successNotification(
                             Notification::make()

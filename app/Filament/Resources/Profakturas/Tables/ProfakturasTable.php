@@ -198,7 +198,7 @@ class ProfakturasTable
                     ->modalDescription(function ($record) {
                         return "Da li želite da kreirate fakturu na osnovu profakture {$record->invoice_number}? Svi podaci će biti kopirani u novu fakturu.";
                     })
-                    ->modalSubmitActionLabel('Kreiraj fakturu')
+                    ->modalSubmitActionLabel(__('actions.create_invoice'))
                     ->modalIcon('heroicon-o-document-text')
                     ->visible(function ($record) {
                         // Only show for non-storno profakturas
@@ -242,7 +242,7 @@ class ProfakturasTable
                         ->modalDescription(function ($record) {
                             return "Da li želite da kreirate avansnu fakturu na osnovu profakture {$record->invoice_number}? Svi podaci će biti kopirani u novu avansnu fakturu.";
                         })
-                        ->modalSubmitActionLabel('Kreiraj avansnu fakturu')
+                        ->modalSubmitActionLabel(__('actions.create_advance_invoice'))
                         ->modalIcon('heroicon-o-document-text')
                         ->visible(function ($record) {
                             // Only show for non-storno profakturas
@@ -272,7 +272,7 @@ class ProfakturasTable
                         ->requiresConfirmation()
                         ->modalHeading('Obriši profakturu')
                         ->modalDescription('Da li ste sigurni da želite da obrišete ovu profakturu? Ova akcija se ne može poništiti.')
-                        ->modalSubmitActionLabel('Obriši')
+                        ->modalSubmitActionLabel(__('actions.delete'))
                         ->action(function ($record) {
                             $record->delete();
 
@@ -297,7 +297,7 @@ class ProfakturasTable
                         ->requiresConfirmation()
                         ->modalHeading('Označi profakture kao plaćene')
                         ->modalDescription('Da li sigurno želite da označite odabrane profakture kao plaćene?')
-                        ->modalSubmitActionLabel('Označi kao plaćeno')
+                        ->modalSubmitActionLabel(__('actions.mark_as_paid'))
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records) {
                             $count = 0;
@@ -320,7 +320,7 @@ class ProfakturasTable
                         ->requiresConfirmation()
                         ->modalHeading('Obriši profakture')
                         ->modalDescription('Da li ste sigurni da želite da obrišete odabrane profakture? Ova akcija se ne može poništiti.')
-                        ->modalSubmitActionLabel('Obriši')
+                        ->modalSubmitActionLabel(__('actions.delete'))
                         ->deselectRecordsAfterCompletion()
                         ->successNotification(
                             Notification::make()

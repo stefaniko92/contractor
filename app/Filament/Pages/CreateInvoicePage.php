@@ -381,8 +381,8 @@ class CreateInvoicePage extends Page implements HasForms
                         ->createOptionAction(function (Action $action) {
                             return $action
                                 ->modalHeading('Dodaj novog klijenta')
-                                ->modalSubmitActionLabel('Kreiraj klijenta')
-                                ->modalCancelActionLabel('Otkaži');
+                                ->modalSubmitActionLabel(__('actions.create_client'))
+                                ->modalCancelActionLabel(__('actions.cancel'));
                         })
                         ->createOptionUsing(function (array $data, $set) {
                             $data['user_id'] = Auth::id();

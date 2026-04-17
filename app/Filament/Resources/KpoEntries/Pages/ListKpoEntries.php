@@ -55,7 +55,7 @@ class ListKpoEntries extends ListRecords
                 })
                 ->modalHeading('Otpremi KPO Knjigu')
                 ->modalDescription('Nakon otpremanja, sistem će automatski izvući sve unose iz PDF-a, pronaći postojeće klijente po imenu, i kreirati nove klijente ako ne postoje.')
-                ->modalSubmitActionLabel('Otpremi i Obradi')
+                ->modalSubmitActionLabel(__('actions.submit_and_process'))
                 ->modalWidth('lg'),
         ];
     }

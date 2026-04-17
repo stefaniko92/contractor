@@ -47,12 +47,12 @@ class EditAvansnaFaktura extends EditRecord
     protected function getSaveFormAction(): Action
     {
         return parent::getSaveFormAction()
-            ->label('Sačuvaj');
+            ->label(__('actions.save'));
     }
 
     protected function getCancelFormAction(): Action
     {
         return parent::getCancelFormAction()
-            ->label('Otkaži');
+            ->label(__('actions.cancel'));
     }
 }

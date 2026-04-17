@@ -75,7 +75,7 @@ class MyCompany extends Page implements HasForms
     {
         return [
             Action::make('save')
-                ->label('Save')
+                ->label(__('actions.save'))
                 ->submit('save')
                 ->color('primary'),
         ];

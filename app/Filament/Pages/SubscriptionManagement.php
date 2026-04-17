@@ -141,6 +141,17 @@ class SubscriptionManagement extends Page
         if ($user->subscribed('default')) {
             $subscription = $user->subscription('default');
 
+            // Check if this is a fake free plan subscription (not a real Stripe subscription)
+            if (str_starts_with($subscription->stripe_id, 'free_plan_')) {
+                return [
+                    'status' => 'free',
+                    'plan_name' => 'Free',
+                    'description' => $plans['free']['description'],
+                    'monthly_invoices' => 3,
+                    'current_invoices' => $user->getMonthlyInvoiceCount(),
+                ];
+            }
+
             return [
                 'status' => 'active',
                 'plan_name' => 'Basic',

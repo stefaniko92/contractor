@@ -80,8 +80,8 @@ class Register extends BaseRegister
                                 ->columnSpanFull(),
                         ]),
                 ])
-                    ->nextAction(fn ($action) => $action->label('Dalje'))
-                    ->previousAction(fn ($action) => $action->label('Nazad'))
+                    ->nextAction(fn ($action) => $action->label(__('actions.next')))
+                    ->previousAction(fn ($action) => $action->label(__('actions.back')))
                     ->submitAction(new \Illuminate\Support\HtmlString(view('filament.pages.auth.wizard-submit-button')->render()))
                     ->columnSpanFull(),
             ]);

@@ -91,7 +91,7 @@ class TaxObligations extends Page
                         ->send();
                 })
                 ->modalHeading('Otpremi Poresko Rešenje')
-                ->modalSubmitActionLabel('Otpremi i Obradi')
+                ->modalSubmitActionLabel(__('actions.submit_and_process'))
                 ->modalWidth('lg'),
         ];
     }
