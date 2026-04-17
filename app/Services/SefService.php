@@ -203,6 +203,15 @@ class SefService
 
             // Handle errors
             if ($response->failed()) {
+                Log::error('SEF API HTTP Error', [
+                    'status' => $response->status(),
+                    'url' => $url,
+                    'method' => $method,
+                    'request_id' => $requestId,
+                    'response_body' => $response->body(),
+                    'response_headers' => $response->headers(),
+                ]);
+
                 return $this->handleHttpError($response, $requestId);
             }
 
@@ -559,27 +568,44 @@ class SefService
     }
 
     /**
+     * Check if a company is registered on eFaktura using the official API endpoint.
+     * This is the correct way to verify companies according to SEF API documentation.
+     */
+    public function checkIfCompanyRegisteredOnEfaktura(string $pib): array
+    {
+        $response = $this->post('publicApi/Company/CheckIfCompanyRegisteredOnEfaktura', [
+            'vatNumber' => $pib,
+        ]);
+
+        if (isset($response['error'])) {
+            return $response;
+        }
+
+        // The response contains eFakturaRegisteredCompany (boolean)
+        return $response;
+    }
+
+    /**
      * Check if a company exists in SEF system by tax identifier (PIB).
+     * Uses the new official endpoint instead of fetching all companies.
      */
     public function checkCompanyExistsByPib(string $pib): array
     {
-        $companiesResponse = $this->getAllCompanies();
+        $response = $this->checkIfCompanyRegisteredOnEfaktura($pib);
 
-        if (isset($companiesResponse['error'])) {
-            return $companiesResponse;
+        if (isset($response['error'])) {
+            return $response;
         }
 
-        $companies = $companiesResponse['companies'] ?? [];
+        // Check if company is registered
+        $isRegistered = $response['eFakturaRegisteredCompany'] ?? false;
 
-        // Search for company by PIB
-        foreach ($companies as $company) {
-            if ($company->getPib() === $pib && $company->isSefEnabled()) {
-                return [
-                    'exists' => true,
-                    'company' => $company,
-                    'message' => 'Kompanija je pronađena i aktivna u SEF sistemu',
-                ];
-            }
+        if ($isRegistered) {
+            return [
+                'exists' => true,
+                'company' => $response,
+                'message' => 'Kompanija je pronađena i aktivna u SEF sistemu',
+            ];
         }
 
         return [
@@ -605,11 +631,13 @@ class SefService
         if ($result['exists']) {
             return [
                 'companies' => [$result['company']],
+                'is_registered' => true,
             ];
         }
 
         return [
             'companies' => [],
+            'is_registered' => false,
         ];
     }
 
