@@ -189,14 +189,13 @@ class UblXmlGenerator
         $accountingCustomerParty = $this->createElement($parent, 'cac:AccountingCustomerParty');
         $party = $this->createElement($accountingCustomerParty, 'cac:Party');
 
-        // Endpoint ID (only include for customer if they are registered in eFaktura system)
-        // For customers not in eFaktura, we skip the EndpointID
-        // Uncomment below if customer is registered in eFaktura:
-        // if ($client->tax_id) {
-        //     $endpointID = $this->createElement($party, 'cbc:EndpointID');
-        //     $endpointID->setAttribute('schemeID', '9948');
-        //     $endpointID->nodeValue = htmlspecialchars($client->tax_id, ENT_XML1, 'UTF-8');
-        // }
+        // Endpoint ID (required for customers registered in eFaktura system)
+        // Include this for verified clients or those with allow_efaktura_bypass enabled
+        if ($client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass)) {
+            $endpointID = $this->createElement($party, 'cbc:EndpointID');
+            $endpointID->setAttribute('schemeID', '9948'); // Required by SEF API
+            $endpointID->nodeValue = htmlspecialchars($client->tax_id, ENT_XML1, 'UTF-8');
+        }
 
         // Party Name
         $partyName = $this->createElement($party, 'cac:PartyName');
