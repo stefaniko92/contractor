@@ -190,12 +190,12 @@ class UblXmlGenerator
         $party = $this->createElement($accountingCustomerParty, 'cac:Party');
 
         // Check if client is a budget user (government entity)
-        $isBudgetUser = str_contains($client->efaktura_verification_error ?? '', 'Budžetski korisnik') ||
-                        str_contains($client->efaktura_verification_error ?? '', 'budget_user');
+        // Budget users are identified by having a JBKJS code
+        $isBudgetUser = !empty($client->jbkjs);
 
         // PartyIdentification (ONLY for budget users - government entities)
         // Budget users MUST have PartyIdentification with their JBKJS code
-        if ($isBudgetUser && $client->jbkjs) {
+        if ($isBudgetUser) {
             $partyIdentification = $this->createElement($party, 'cac:PartyIdentification');
             $idElement = $this->createElement($partyIdentification, 'cbc:ID');
             $idElement->setAttribute('schemeID', '9949'); // JBKJS scheme ID for budget users
