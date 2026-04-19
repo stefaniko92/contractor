@@ -17,6 +17,37 @@ class EditClient extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('manual_verify')
+                ->label('Označi kao verifikovan')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->visible(fn () => $this->record->efaktura_status !== 'active' && ! empty($this->record->tax_id))
+                ->requiresConfirmation()
+                ->modalHeading('Ručna verifikacija klijenta')
+                ->modalDescription(fn () => "Da li ste sigurni da klijent \"{$this->record->company_name}\" (PIB: {$this->record->tax_id}) postoji u SEF/eFaktura sistemu? Ovo će omogućiti slanje faktura ovom klijentu.")
+                ->modalSubmitActionLabel(__('actions.confirm'))
+                ->action(function () {
+                    $this->record->update([
+                        'efaktura_verified' => true,
+                        'efaktura_verified_at' => now(),
+                        'efaktura_status' => 'active',
+                        'efaktura_verification_error' => 'Ručno verifikovan',
+                    ]);
+
+                    Notification::make()
+                        ->title('Klijent označen kao verifikovan')
+                        ->body("Možete sada slati fakture klijentu \"{$this->record->company_name}\" putem eFaktura sistema.")
+                        ->success()
+                        ->send();
+
+                    Log::info('Client manually verified', [
+                        'client_id' => $this->record->id,
+                        'tax_id' => $this->record->tax_id,
+                        'company_name' => $this->record->company_name,
+                        'verified_by' => auth()->id(),
+                    ]);
+                }),
+
             Action::make('verify_efaktura')
                 ->label('Proveri u eFaktura')
                 ->icon('heroicon-o-shield-check')
@@ -65,24 +96,36 @@ class EditClient extends EditRecord
                         $result = $sefService->searchCompanyByPib($this->record->tax_id);
 
                         if (isset($result['error'])) {
-                            // API error
+                            // API error - likely 404 on production
+                            $errorMessage = $result['error'];
+                            $isNotFoundError = str_contains($errorMessage, '404');
+
                             $this->record->update([
                                 'efaktura_verified' => true,
                                 'efaktura_verified_at' => now(),
                                 'efaktura_status' => 'error',
-                                'efaktura_verification_error' => $result['error'],
+                                'efaktura_verification_error' => $errorMessage,
                             ]);
 
-                            Notification::make()
-                                ->title('Greška pri verifikaciji')
-                                ->body($result['error'])
-                                ->danger()
-                                ->send();
+                            if ($isNotFoundError) {
+                                Notification::make()
+                                    ->title('Automatska verifikacija nije dostupna')
+                                    ->body('SEF API ne podržava automatsku verifikaciju na produkciji. Ako znate da klijent postoji u SEF sistemu, koristite "Označi kao verifikovan" dugme ili omogućite "Dozvoli slanje bez verifikacije" opciju.')
+                                    ->warning()
+                                    ->persistent()
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->title('Greška pri verifikaciji')
+                                    ->body($errorMessage)
+                                    ->danger()
+                                    ->send();
+                            }
 
                             Log::error('eFaktura verification error', [
                                 'client_id' => $this->record->id,
                                 'tax_id' => $this->record->tax_id,
-                                'error' => $result['error'],
+                                'error' => $errorMessage,
                             ]);
                         } elseif (! empty($result['companies'])) {
                             // Company found
