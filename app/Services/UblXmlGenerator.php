@@ -193,6 +193,16 @@ class UblXmlGenerator
         // Budget users are identified by having a JBKJS code
         $isBudgetUser = !empty($client->jbkjs);
 
+        // Endpoint ID (required for customers registered in eFaktura system)
+        // Include this for verified clients or those with allow_efaktura_bypass enabled
+        // Budget users need BOTH EndpointID (PIB) AND PartyIdentification (JBKJS)
+        // EndpointID must come BEFORE PartyIdentification in XML structure
+        if ($client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass || $isBudgetUser)) {
+            $endpointID = $this->createElement($party, 'cbc:EndpointID');
+            $endpointID->setAttribute('schemeID', '9948'); // Required by SEF API
+            $endpointID->nodeValue = htmlspecialchars($client->tax_id, ENT_XML1, 'UTF-8');
+        }
+
         // PartyIdentification (ONLY for budget users - government entities)
         // Budget users MUST have PartyIdentification with their JBKJS code
         if ($isBudgetUser) {
@@ -200,15 +210,6 @@ class UblXmlGenerator
             $idElement = $this->createElement($partyIdentification, 'cbc:ID');
             $idElement->setAttribute('schemeID', '9949'); // JBKJS scheme ID for budget users
             $idElement->nodeValue = htmlspecialchars($client->jbkjs, ENT_XML1, 'UTF-8');
-        }
-
-        // Endpoint ID (required for customers registered in eFaktura system)
-        // Include this for verified clients or those with allow_efaktura_bypass enabled
-        // Budget users need BOTH PartyIdentification (JBKJS) AND EndpointID (PIB)
-        if ($client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass || $isBudgetUser)) {
-            $endpointID = $this->createElement($party, 'cbc:EndpointID');
-            $endpointID->setAttribute('schemeID', '9948'); // Required by SEF API
-            $endpointID->nodeValue = htmlspecialchars($client->tax_id, ENT_XML1, 'UTF-8');
         }
 
         // Party Name
