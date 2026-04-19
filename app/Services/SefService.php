@@ -594,6 +594,21 @@ class SefService
         $response = $this->checkIfCompanyRegisteredOnEfaktura($pib);
 
         if (isset($response['error'])) {
+            // Check if it's a budget user error (which means the company exists!)
+            $errorMessage = $response['error'];
+            $isBudgetUserError = isset($response['response_body']) &&
+                                 str_contains($response['response_body'], 'CompanyWithVATRegistrationCodeIsBudgetUser');
+
+            if ($isBudgetUserError) {
+                // Budget users exist in SEF but need special handling
+                return [
+                    'exists' => true,
+                    'is_budget_user' => true,
+                    'company' => ['pib' => $pib, 'type' => 'budget_user'],
+                    'message' => 'Kompanija je pronađena - budžetski korisnik (javna ustanova)',
+                ];
+            }
+
             return $response;
         }
 
@@ -603,6 +618,7 @@ class SefService
         if ($isRegistered) {
             return [
                 'exists' => true,
+                'is_budget_user' => false,
                 'company' => $response,
                 'message' => 'Kompanija je pronađena i aktivna u SEF sistemu',
             ];

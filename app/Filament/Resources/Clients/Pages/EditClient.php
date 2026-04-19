@@ -127,18 +127,24 @@ class EditClient extends EditRecord
                                 'tax_id' => $this->record->tax_id,
                                 'error' => $errorMessage,
                             ]);
-                        } elseif (! empty($result['companies'])) {
-                            // Company found
+                        } elseif (! empty($result['companies']) || ($result['exists'] ?? false)) {
+                            // Company found (regular or budget user)
+                            $isBudgetUser = $result['is_budget_user'] ?? false;
+
                             $this->record->update([
                                 'efaktura_verified' => true,
                                 'efaktura_verified_at' => now(),
                                 'efaktura_status' => 'active',
-                                'efaktura_verification_error' => null,
+                                'efaktura_verification_error' => $isBudgetUser ? 'Budžetski korisnik (javna ustanova)' : null,
                             ]);
+
+                            $message = $isBudgetUser
+                                ? "Klijent \"{$this->record->company_name}\" je budžetski korisnik (javna ustanova). Možete mu slati fakture - napomena: potrebno je koristiti 'SendToCir' opciju pri slanju."
+                                : "Klijent \"{$this->record->company_name}\" postoji u eFaktura sistemu i možete mu slati fakture.";
 
                             Notification::make()
                                 ->title('Klijent pronađen!')
-                                ->body("Klijent \"{$this->record->company_name}\" postoji u eFaktura sistemu i možete mu slati fakture.")
+                                ->body($message)
                                 ->success()
                                 ->send();
 
@@ -146,6 +152,7 @@ class EditClient extends EditRecord
                                 'client_id' => $this->record->id,
                                 'tax_id' => $this->record->tax_id,
                                 'company_name' => $this->record->company_name,
+                                'is_budget_user' => $isBudgetUser,
                             ]);
                         } else {
                             // Company not found
