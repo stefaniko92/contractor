@@ -189,6 +189,20 @@ class UblXmlGenerator
         $accountingCustomerParty = $this->createElement($parent, 'cac:AccountingCustomerParty');
         $party = $this->createElement($accountingCustomerParty, 'cac:Party');
 
+        // Check if client is a budget user (government entity)
+        $isBudgetUser = str_contains($client->efaktura_verification_error ?? '', 'Budžetski korisnik') ||
+                        str_contains($client->efaktura_verification_error ?? '', 'budget_user');
+
+        // PartyIdentification (ONLY for budget users - government entities)
+        // Budget users MUST have PartyIdentification with their JBKJS code
+        if ($isBudgetUser && $client->tax_id) {
+            $partyIdentification = $this->createElement($party, 'cac:PartyIdentification');
+            $idElement = $this->createElement($partyIdentification, 'cbc:ID');
+            // For budget users, use their VAT number as the ID
+            // Ideally this should be JBKJS code, but if not available, use PIB
+            $idElement->nodeValue = htmlspecialchars($client->tax_id, ENT_XML1, 'UTF-8');
+        }
+
         // Endpoint ID (required for customers registered in eFaktura system)
         // Include this for verified clients or those with allow_efaktura_bypass enabled
         if ($client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass)) {
