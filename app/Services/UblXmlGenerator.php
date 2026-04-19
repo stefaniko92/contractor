@@ -193,6 +193,17 @@ class UblXmlGenerator
         // Budget users are identified by having a JBKJS code
         $isBudgetUser = !empty($client->jbkjs);
 
+        // Log budget user detection for debugging
+        \Log::info('Customer Party Budget User Detection', [
+            'invoice_id' => $invoice->id,
+            'client_id' => $client->id,
+            'client_pib' => $client->tax_id,
+            'client_jbkjs' => $client->jbkjs,
+            'is_budget_user' => $isBudgetUser,
+            'efaktura_status' => $client->efaktura_status,
+            'allow_bypass' => $client->allow_efaktura_bypass,
+        ]);
+
         // Endpoint ID (required for customers registered in eFaktura system)
         // Include this for verified clients or those with allow_efaktura_bypass enabled
         // Budget users need BOTH EndpointID (PIB) AND PartyIdentification (JBKJS)
@@ -201,6 +212,12 @@ class UblXmlGenerator
             $endpointID = $this->createElement($party, 'cbc:EndpointID');
             $endpointID->setAttribute('schemeID', '9948'); // Required by SEF API
             $endpointID->nodeValue = htmlspecialchars($client->tax_id, ENT_XML1, 'UTF-8');
+
+            \Log::info('Added EndpointID for customer', [
+                'invoice_id' => $invoice->id,
+                'endpoint_id' => $client->tax_id,
+                'scheme_id' => '9948',
+            ]);
         }
 
         // PartyIdentification (ONLY for budget users - government entities)
@@ -210,6 +227,12 @@ class UblXmlGenerator
             $idElement = $this->createElement($partyIdentification, 'cbc:ID');
             $idElement->setAttribute('schemeID', '9949'); // JBKJS scheme ID for budget users
             $idElement->nodeValue = htmlspecialchars($client->jbkjs, ENT_XML1, 'UTF-8');
+
+            \Log::info('Added PartyIdentification for budget user', [
+                'invoice_id' => $invoice->id,
+                'jbkjs_code' => $client->jbkjs,
+                'scheme_id' => '9949',
+            ]);
         }
 
         // Party Name

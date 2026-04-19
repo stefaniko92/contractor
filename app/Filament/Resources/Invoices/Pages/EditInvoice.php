@@ -312,6 +312,14 @@ class EditInvoice extends EditRecord
                             'xml_length' => strlen($xmlContent),
                         ]);
 
+                        // Log the full XML for debugging budget user issues
+                        Log::info('Generated XML content for debugging', [
+                            'invoice_id' => $this->record->id,
+                            'client_pib' => $this->record->client->tax_id,
+                            'client_jbkjs' => $this->record->client->jbkjs,
+                            'xml_content' => $xmlContent,
+                        ]);
+
                         $response = $sefService->sendInvoice($xmlContent, 'Yes');
 
                         if (isset($response['error'])) {
