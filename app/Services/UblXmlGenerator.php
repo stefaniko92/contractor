@@ -195,12 +195,11 @@ class UblXmlGenerator
 
         // PartyIdentification (ONLY for budget users - government entities)
         // Budget users MUST have PartyIdentification with their JBKJS code
-        if ($isBudgetUser && $client->tax_id) {
+        if ($isBudgetUser && $client->jbkjs) {
             $partyIdentification = $this->createElement($party, 'cac:PartyIdentification');
             $idElement = $this->createElement($partyIdentification, 'cbc:ID');
-            // For budget users, use their VAT number as the ID
-            // Ideally this should be JBKJS code, but if not available, use PIB
-            $idElement->nodeValue = htmlspecialchars($client->tax_id, ENT_XML1, 'UTF-8');
+            $idElement->setAttribute('schemeID', '9949'); // JBKJS scheme ID for budget users
+            $idElement->nodeValue = htmlspecialchars($client->jbkjs, ENT_XML1, 'UTF-8');
         }
 
         // Endpoint ID (required for customers registered in eFaktura system)

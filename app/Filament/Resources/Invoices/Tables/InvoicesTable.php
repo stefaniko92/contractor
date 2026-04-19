@@ -470,8 +470,11 @@ class InvoicesTable
                         ->modalIcon('heroicon-o-envelope')
                         ->modalWidth(FilamentHelper::getModalSizeForContext('efaktura_modal'))
                         ->visible(function ($record) {
-                            // Only show if not sent to eFaktura yet and not a storno invoice
-                            return ! $record->is_storno && $record->efakturaInvoice === null;
+                            // Show if not sent to eFaktura yet, or if previous send failed
+                            return ! $record->is_storno && (
+                                $record->efakturaInvoice === null ||
+                                $record->efakturaInvoice->status === 'failed'
+                            );
                         })
                         ->action(function (array $data, $record) {
                             $dueDate = $data['due_date'] ?? now()->addDays(30);
@@ -559,15 +562,17 @@ class InvoicesTable
                                 $response = $sefService->sendInvoice($xmlContent, 'Yes');
 
                                 if (isset($response['error'])) {
-                                    // Store failed attempt
-                                    \App\Models\EfakturaInvoice::create([
-                                        'invoice_id' => $record->id,
-                                        'user_id' => $record->user_id,
-                                        'status' => 'failed',
-                                        'last_error' => $response['error'],
-                                        'last_error_at' => now(),
-                                        'sef_response' => $response,
-                                    ]);
+                                    // Update existing record or create new one
+                                    \App\Models\EfakturaInvoice::updateOrCreate(
+                                        ['invoice_id' => $record->id],
+                                        [
+                                            'user_id' => $record->user_id,
+                                            'status' => 'failed',
+                                            'last_error' => $response['error'],
+                                            'last_error_at' => now(),
+                                            'sef_response' => $response,
+                                        ]
+                                    );
 
                                     Notification::make()
                                         ->title('Greška pri slanju fakture')
@@ -584,25 +589,29 @@ class InvoicesTable
                                     return;
                                 }
 
-                                // Store successful send in efaktura_invoices table
-                                $efakturaInvoice = \App\Models\EfakturaInvoice::create([
-                                    'invoice_id' => $record->id,
-                                    'user_id' => $record->user_id,
-                                    'sef_invoice_id' => $response['SalesInvoiceId'] ?? $response['InvoiceId'] ?? $response['invoiceId'] ?? $response['id'] ?? null,
-                                    'sef_invoice_number' => $response['InvoiceNumber'] ?? $response['invoiceNumber'] ?? null,
-                                    'sef_request_id' => $response['RequestId'] ?? $response['requestId'] ?? null,
-                                    'status' => 'sent',
-                                    'sent_at' => now(),
-                                    'sef_response' => $response,
-                                    'status_history' => [
-                                        [
-                                            'from' => 'draft',
-                                            'to' => 'sent',
-                                            'changed_at' => now()->toISOString(),
-                                            'data' => $response,
+                                // Update existing record or create new one
+                                $efakturaInvoice = \App\Models\EfakturaInvoice::updateOrCreate(
+                                    ['invoice_id' => $record->id],
+                                    [
+                                        'user_id' => $record->user_id,
+                                        'sef_invoice_id' => $response['SalesInvoiceId'] ?? $response['InvoiceId'] ?? $response['invoiceId'] ?? $response['id'] ?? null,
+                                        'sef_invoice_number' => $response['InvoiceNumber'] ?? $response['invoiceNumber'] ?? null,
+                                        'sef_request_id' => $response['RequestId'] ?? $response['requestId'] ?? null,
+                                        'status' => 'sent',
+                                        'sent_at' => now(),
+                                        'last_error' => null,
+                                        'last_error_at' => null,
+                                        'sef_response' => $response,
+                                        'status_history' => [
+                                            [
+                                                'from' => $record->efakturaInvoice?->status ?? 'draft',
+                                                'to' => 'sent',
+                                                'changed_at' => now()->toISOString(),
+                                                'data' => $response,
+                                            ],
                                         ],
-                                    ],
-                                ]);
+                                    ]
+                                );
 
                                 Notification::make()
                                     ->title('eFaktura uspešno poslata')

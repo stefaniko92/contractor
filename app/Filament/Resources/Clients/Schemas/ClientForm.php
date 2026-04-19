@@ -67,6 +67,12 @@ class ClientForm
                                     ->maxLength(255)
                                     ->live(onBlur: true),
 
+                                TextInput::make('jbkjs')
+                                    ->label('JBKJS (samo za budžetske korisnike)')
+                                    ->helperText('Šifra budžetskog korisnika - obavezno za javne ustanove i državne organe')
+                                    ->maxLength(255)
+                                    ->visible(fn ($get) => $get('is_domestic')),
+
                                 FormAction::make('fetch_by_pib')
                                     ->label('Pretraži po PIB-u')
                                     ->icon('heroicon-o-magnifying-glass')

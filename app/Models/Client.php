@@ -12,6 +12,7 @@ class Client extends Model
         'user_id',
         'company_name',
         'tax_id',
+        'jbkjs',
         'address',
         'email',
         'phone',
