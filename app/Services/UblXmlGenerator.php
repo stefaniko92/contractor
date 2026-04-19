@@ -204,7 +204,8 @@ class UblXmlGenerator
 
         // Endpoint ID (required for customers registered in eFaktura system)
         // Include this for verified clients or those with allow_efaktura_bypass enabled
-        if ($client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass)) {
+        // IMPORTANT: Do NOT include EndpointID for budget users - they use PartyIdentification instead
+        if (! $isBudgetUser && $client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass)) {
             $endpointID = $this->createElement($party, 'cbc:EndpointID');
             $endpointID->setAttribute('schemeID', '9948'); // Required by SEF API
             $endpointID->nodeValue = htmlspecialchars($client->tax_id, ENT_XML1, 'UTF-8');
