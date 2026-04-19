@@ -178,10 +178,9 @@ class SefService
                     $fullUrl .= '?'.http_build_query($options['query']);
                 }
 
-                // Use post() with the raw body directly via Guzzle options
-                $response = $http->post($fullUrl, [
-                    'body' => $options['body'],
-                ]);
+                // Send raw body directly using withBody()
+                $response = $http->withBody($options['body'], $headers['Content-Type'] ?? 'application/xml')
+                    ->post($fullUrl);
             } else {
                 $response = match (strtoupper($method)) {
                     'GET' => $http->get($url, $options['query'] ?? []),
@@ -746,10 +745,25 @@ class SefService
         // Build endpoint with query parameters
         $endpoint = 'publicApi/sales-invoice/ubl';
 
-        // Send XML directly as application/xml
+        // Clean and validate XML
+        $xmlContent = trim($xmlContent);
+
+        // Ensure XML declaration is present
+        if (! str_starts_with($xmlContent, '<?xml')) {
+            $xmlContent = '<?xml version="1.0" encoding="UTF-8"?>' . "\n" . $xmlContent;
+        }
+
+        // Log XML for debugging (first 500 chars)
+        Log::info('Sending UBL XML to eFaktura', [
+            'xml_preview' => substr($xmlContent, 0, 500),
+            'xml_length' => strlen($xmlContent),
+            'params' => $params,
+        ]);
+
+        // Send XML directly as application/xml with UTF-8 charset
         $options = [
             'headers' => [
-                'Content-Type' => 'application/xml',
+                'Content-Type' => 'application/xml; charset=utf-8',
             ],
             'body' => $xmlContent,
         ];
