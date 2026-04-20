@@ -208,7 +208,19 @@ class UblXmlGenerator
         // Include this for verified clients or those with allow_efaktura_bypass enabled
         // Budget users need BOTH EndpointID (PIB) AND PartyIdentification (JBKJS)
         // EndpointID must come BEFORE PartyIdentification in XML structure
-        if ($client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass || $isBudgetUser)) {
+        $shouldAddEndpointId = $client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass || $isBudgetUser);
+
+        \Log::info('EndpointID decision', [
+            'invoice_id' => $invoice->id,
+            'has_tax_id' => !empty($client->tax_id),
+            'tax_id_value' => $client->tax_id,
+            'efaktura_status' => $client->efaktura_status,
+            'allow_bypass' => $client->allow_efaktura_bypass,
+            'is_budget_user' => $isBudgetUser,
+            'should_add_endpoint_id' => $shouldAddEndpointId,
+        ]);
+
+        if ($shouldAddEndpointId) {
             $endpointID = $this->createElement($party, 'cbc:EndpointID');
             $endpointID->setAttribute('schemeID', '9948'); // Required by SEF API
             $endpointID->nodeValue = htmlspecialchars($client->tax_id, ENT_XML1, 'UTF-8');
@@ -255,7 +267,8 @@ class UblXmlGenerator
         }
 
         // Party Tax Scheme (if client has tax ID)
-        if ($client->tax_id) {
+        // IMPORTANT: Budget users should NOT have PartyTaxScheme
+        if ($client->tax_id && !$isBudgetUser) {
             $partyTaxScheme = $this->createElement($party, 'cac:PartyTaxScheme');
             $clientTaxId = $this->createElement($partyTaxScheme, 'cbc:CompanyID');
             $clientTaxId->setAttribute('schemeID', '9948'); // Serbian Tax ID scheme
