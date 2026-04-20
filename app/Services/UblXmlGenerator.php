@@ -364,10 +364,10 @@ class UblXmlGenerator
 
         // Tax Category
         $taxCategory = $this->createElement($taxSubtotal, 'cac:TaxCategory');
-        $this->addElement($taxCategory, 'cbc:ID', 'S'); // S = Standard rate (but with 0% for paušalci)
+        $this->addElement($taxCategory, 'cbc:ID', 'Z'); // Z = Zero-rated
         $this->addElement($taxCategory, 'cbc:Percent', '0');
 
-        // Paušalci use standard category with 0% rate, no exemption reason needed
+        // Paušalci use zero-rated category (0% VAT rate)
 
         $taxScheme = $this->createElement($taxCategory, 'cac:TaxScheme');
         $this->addElement($taxScheme, 'cbc:ID', 'VAT');
@@ -434,7 +434,7 @@ class UblXmlGenerator
 
             // Classified Tax Category
             $classifiedTaxCategory = $this->createElement($itemElement, 'cac:ClassifiedTaxCategory');
-            $this->addElement($classifiedTaxCategory, 'cbc:ID', 'S'); // S = Standard rate with 0%
+            $this->addElement($classifiedTaxCategory, 'cbc:ID', 'Z'); // Z = Zero-rated
             $this->addElement($classifiedTaxCategory, 'cbc:Percent', '0');
 
             $taxScheme = $this->createElement($classifiedTaxCategory, 'cac:TaxScheme');
