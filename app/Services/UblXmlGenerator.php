@@ -54,7 +54,8 @@ class UblXmlGenerator
 
         // Invoice Number and Type
         $this->addElement($root, 'cbc:ID', $invoice->invoice_number);
-        $this->addElement($root, 'cbc:IssueDate', $invoice->issue_date->format('Y-m-d'));
+        // SEF requires IssueDate to be today's date
+        $this->addElement($root, 'cbc:IssueDate', now()->format('Y-m-d'));
 
         if ($invoice->due_date) {
             $this->addElement($root, 'cbc:DueDate', $invoice->due_date->format('Y-m-d'));
