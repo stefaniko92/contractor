@@ -204,9 +204,9 @@ class UblXmlGenerator
             'allow_bypass' => $client->allow_efaktura_bypass,
         ]);
 
-        // Endpoint ID (required for non-budget customers registered in eFaktura system)
-        // Budget users should NOT have EndpointID - they use PartyIdentification with JBKJS instead
-        $shouldAddEndpointId = !$isBudgetUser && $client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass);
+        // Endpoint ID (required for all customers registered in eFaktura system)
+        // Both regular and budget users need EndpointID with PIB
+        $shouldAddEndpointId = $client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass || $isBudgetUser);
 
         \Log::info('EndpointID decision', [
             'invoice_id' => $invoice->id,
@@ -231,17 +231,18 @@ class UblXmlGenerator
         }
 
         // PartyIdentification (ONLY for budget users - government entities)
-        // Budget users MUST have PartyIdentification with their JBKJS code
+        // Budget users MUST have PartyIdentification with JBKJS in format "JBKJS:xxxxx"
+        // NO schemeID attribute for PartyIdentification/ID!
         if ($isBudgetUser) {
             $partyIdentification = $this->createElement($party, 'cac:PartyIdentification');
             $idElement = $this->createElement($partyIdentification, 'cbc:ID');
-            $idElement->setAttribute('schemeID', '9949'); // JBKJS scheme ID for budget users
-            $idElement->nodeValue = htmlspecialchars($client->jbkjs, ENT_XML1, 'UTF-8');
+            // NO schemeID attribute! Format must be "JBKJS:xxxxx"
+            $idElement->nodeValue = htmlspecialchars('JBKJS:' . $client->jbkjs, ENT_XML1, 'UTF-8');
 
             \Log::info('Added PartyIdentification for budget user', [
                 'invoice_id' => $invoice->id,
-                'jbkjs_code' => $client->jbkjs,
-                'scheme_id' => '9949',
+                'jbkjs_value' => 'JBKJS:' . $client->jbkjs,
+                'note' => 'No schemeID attribute for budget users',
             ]);
         }
 
@@ -265,8 +266,8 @@ class UblXmlGenerator
         }
 
         // Party Tax Scheme (if client has tax ID)
-        // IMPORTANT: Budget users should NOT have PartyTaxScheme
-        if ($client->tax_id && !$isBudgetUser) {
+        // Both regular and budget users need PartyTaxScheme with RS+PIB
+        if ($client->tax_id) {
             $partyTaxScheme = $this->createElement($party, 'cac:PartyTaxScheme');
             $clientTaxId = $this->createElement($partyTaxScheme, 'cbc:CompanyID');
             $clientTaxId->setAttribute('schemeID', '9948'); // Serbian Tax ID scheme
