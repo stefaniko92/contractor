@@ -54,8 +54,8 @@ class UblXmlGenerator
 
         // Invoice Number and Type
         $this->addElement($root, 'cbc:ID', $invoice->invoice_number);
-        // SEF requires IssueDate to be today's date
-        $this->addElement($root, 'cbc:IssueDate', now()->format('Y-m-d'));
+        // SEF requires IssueDate to be today's date in Serbian timezone (Europe/Belgrade)
+        $this->addElement($root, 'cbc:IssueDate', now()->timezone('Europe/Belgrade')->format('Y-m-d'));
 
         if ($invoice->due_date) {
             $this->addElement($root, 'cbc:DueDate', $invoice->due_date->format('Y-m-d'));
@@ -86,9 +86,9 @@ class UblXmlGenerator
 
         // Add Delivery (required by SEF) - must come after parties
         $delivery = $this->createElement($root, 'cac:Delivery');
-        // Use invoice delivery_date if available, otherwise use today's date
-        $deliveryDate = $invoice->delivery_date ?? now();
-        $this->addElement($delivery, 'cbc:ActualDeliveryDate', $deliveryDate->format('Y-m-d'));
+        // Use invoice delivery_date if available, otherwise use today's date in Serbian timezone
+        $deliveryDate = $invoice->delivery_date ?? now()->timezone('Europe/Belgrade');
+        $this->addElement($delivery, 'cbc:ActualDeliveryDate', $deliveryDate->timezone('Europe/Belgrade')->format('Y-m-d'));
 
         // Add Payment Means
         $this->addPaymentMeans($root, $invoice);
