@@ -204,11 +204,9 @@ class UblXmlGenerator
             'allow_bypass' => $client->allow_efaktura_bypass,
         ]);
 
-        // Endpoint ID (required for customers registered in eFaktura system)
-        // Include this for verified clients or those with allow_efaktura_bypass enabled
-        // Budget users need BOTH EndpointID (PIB) AND PartyIdentification (JBKJS)
-        // EndpointID must come BEFORE PartyIdentification in XML structure
-        $shouldAddEndpointId = $client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass || $isBudgetUser);
+        // Endpoint ID (required for non-budget customers registered in eFaktura system)
+        // Budget users should NOT have EndpointID - they use PartyIdentification with JBKJS instead
+        $shouldAddEndpointId = !$isBudgetUser && $client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass);
 
         \Log::info('EndpointID decision', [
             'invoice_id' => $invoice->id,
