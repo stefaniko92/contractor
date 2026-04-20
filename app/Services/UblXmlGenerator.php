@@ -78,17 +78,17 @@ class UblXmlGenerator
             $this->addElement($root, 'cbc:AccountingCost', $invoice->trading_place);
         }
 
-        // Add Delivery (required by SEF)
-        $delivery = $this->createElement($root, 'cac:Delivery');
-        // Use invoice delivery_date if available, otherwise use today's date
-        $deliveryDate = $invoice->delivery_date ?? now();
-        $this->addElement($delivery, 'cbc:ActualDeliveryDate', $deliveryDate->format('Y-m-d'));
-
         // Add Supplier Party (Your Company)
         $this->addSupplierParty($root, $invoice);
 
         // Add Customer Party (Client)
         $this->addCustomerParty($root, $invoice);
+
+        // Add Delivery (required by SEF) - must come after parties
+        $delivery = $this->createElement($root, 'cac:Delivery');
+        // Use invoice delivery_date if available, otherwise use today's date
+        $deliveryDate = $invoice->delivery_date ?? now();
+        $this->addElement($delivery, 'cbc:ActualDeliveryDate', $deliveryDate->format('Y-m-d'));
 
         // Add Payment Means
         $this->addPaymentMeans($root, $invoice);
