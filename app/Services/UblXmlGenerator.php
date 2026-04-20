@@ -367,10 +367,8 @@ class UblXmlGenerator
         $this->addElement($taxCategory, 'cbc:ID', 'O'); // O = Outside the scope of VAT (not subject to VAT)
         $this->addElement($taxCategory, 'cbc:Percent', '0');
 
-        // Serbian flat-tax entrepreneurs (paušalci) are not in VAT system
-        // Use Serbian ZPDV code for "nije predmet oporezivanja" (not subject to VAT)
-        $this->addElement($taxCategory, 'cbc:TaxExemptionReasonCode', '1');
-        $this->addElement($taxCategory, 'cbc:TaxExemptionReason', 'Paušalno oporezivanje - nije obveznik PDV');
+        // For category O (Outside VAT scope), no exemption reason is needed
+        // Paušalci are not VAT payers, they're outside the VAT system entirely
 
         $taxScheme = $this->createElement($taxCategory, 'cac:TaxScheme');
         $this->addElement($taxScheme, 'cbc:ID', 'VAT');
