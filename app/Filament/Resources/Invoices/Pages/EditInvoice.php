@@ -355,7 +355,7 @@ class EditInvoice extends EditRecord
                             ['invoice_id' => $this->record->id],
                             [
                                 'user_id' => $this->record->user_id,
-                                'sef_invoice_id' => $response['SalesInvoiceId'] ?? $response['InvoiceId'] ?? $response['invoiceId'] ?? $response['id'] ?? null,
+                                'sef_invoice_id' => $response['SalesInvoiceId'] ?? $response['salesInvoiceId'] ?? $response['InvoiceId'] ?? $response['invoiceId'] ?? $response['id'] ?? null,
                                 'sef_invoice_number' => $response['InvoiceNumber'] ?? $response['invoiceNumber'] ?? null,
                                 'sef_request_id' => $response['RequestId'] ?? $response['requestId'] ?? null,
                                 'status' => 'sent',

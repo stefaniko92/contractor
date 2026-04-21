@@ -6,6 +6,8 @@ use App\Models\SefEfakturaSetting;
 use App\Models\User;
 use App\Services\SefService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SefServiceTest extends TestCase
@@ -133,6 +135,39 @@ class SefServiceTest extends TestCase
 
         $this->assertTrue($service->isConfigured());
         $this->assertEquals($this->user->id, $service->getSefSettings()->user_id);
+    }
+
+    #[Test]
+    public function it_omits_large_successful_json_responses_without_losing_invoice_ids(): void
+    {
+        SefEfakturaSetting::factory()->create([
+            'user_id' => $this->user->id,
+            'is_enabled' => true,
+            'api_key' => 'test-api-key',
+        ]);
+
+        $responseBody = json_encode([
+            'salesInvoiceId' => 123456,
+            'invoiceId' => 654321,
+            'requestId' => 'sef-request-123',
+            'padding' => str_repeat('x', 1048577),
+        ]);
+
+        Http::fake([
+            '*' => Http::response($responseBody, 200, [
+                'Content-Type' => 'application/json',
+                'Content-Length' => (string) strlen($responseBody),
+            ]),
+        ]);
+
+        $response = SefService::forUser($this->user->id)->sendInvoice('<Invoice />', 'Yes');
+
+        $this->assertSame(123456, $response['salesInvoiceId']);
+        $this->assertSame(654321, $response['invoiceId']);
+        $this->assertSame('sef-request-123', $response['requestId']);
+        $this->assertTrue($response['response_omitted']);
+        $this->assertSame(strlen($responseBody), $response['response_size']);
+        $this->assertArrayNotHasKey('padding', $response);
     }
 
     /** @test */

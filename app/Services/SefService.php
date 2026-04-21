@@ -16,6 +16,23 @@ use Illuminate\Support\Facades\Log;
 
 class SefService
 {
+    private const MAX_JSON_DECODE_BYTES = 1048576;
+
+    private const MAX_LOGGED_RESPONSE_BODY_BYTES = 4096;
+
+    private const LARGE_RESPONSE_JSON_KEYS = [
+        'salesInvoiceId',
+        'invoiceId',
+        'purchaseInvoiceId',
+        'SalesInvoiceId',
+        'InvoiceId',
+        'PurchaseInvoiceId',
+        'RequestId',
+        'requestId',
+        'InvoiceNumber',
+        'invoiceNumber',
+    ];
+
     protected ?string $apiKey;
 
     protected string $baseUrl;
@@ -191,11 +208,12 @@ class SefService
             }
 
             $duration = round((microtime(true) - $startTime) * 1000, 2);
+            $responseSize = $this->getResponseBodySize($response);
 
             Log::info('SEF API Response', [
                 'status_code' => $response->status(),
                 'duration_ms' => $duration,
-                'response_size' => strlen($response->body()),
+                'response_size' => $responseSize,
                 'request_id' => $requestId,
                 'user_id' => $this->sefSettings?->user_id,
             ]);
@@ -207,7 +225,7 @@ class SefService
                     'url' => $url,
                     'method' => $method,
                     'request_id' => $requestId,
-                    'response_body' => $response->body(),
+                    'response_body' => $this->getLimitedResponseBody($response),
                     'response_headers' => $response->headers(),
                 ]);
 
@@ -242,9 +260,18 @@ class SefService
     protected function parseHttpResponse(Response $response): array
     {
         $contentType = $response->header('Content-Type') ?? '';
+        $responseSize = $this->getResponseBodySize($response);
 
         // Handle JSON responses
         if (str_contains($contentType, 'application/json')) {
+            if ($responseSize !== null && $responseSize > self::MAX_JSON_DECODE_BYTES) {
+                return $this->parseLargeJsonResponse($response, $contentType, $responseSize);
+            }
+
+            if ($responseSize === null) {
+                return $this->parseJsonResponseWithUnknownSize($response, $contentType);
+            }
+
             return $response->json() ?? [];
         }
 
@@ -274,7 +301,7 @@ class SefService
     protected function handleHttpError(Response $response, string $requestId): array
     {
         $statusCode = $response->status();
-        $responseBody = $response->body();
+        $responseBody = $this->getLimitedResponseBody($response);
 
         return [
             'error' => "SEF API request failed with status {$statusCode}: {$responseBody}",
@@ -312,7 +339,7 @@ class SefService
     {
         $response = $e->response;
         $statusCode = $response ? $response->status() : 0;
-        $responseBody = $response ? $response->body() : 'No response body';
+        $responseBody = $response ? $this->getLimitedResponseBody($response) : 'No response body';
 
         return [
             'error_type' => 'RequestException',
@@ -321,6 +348,156 @@ class SefService
             'response_body' => $responseBody,
             'request_id' => $requestId,
         ];
+    }
+
+    /**
+     * Parse oversized JSON without decoding the full response into memory.
+     *
+     * @return array<string, mixed>
+     */
+    protected function parseLargeJsonResponse(Response $response, string $contentType, ?int $responseSize): array
+    {
+        return array_merge(
+            $this->extractJsonScalarValues($response->resource(), self::LARGE_RESPONSE_JSON_KEYS),
+            [
+                'response_omitted' => true,
+                'response_size' => $responseSize,
+                'content_type' => $contentType,
+                'message' => 'SEF returned a large response body that was not stored.',
+            ],
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function parseJsonResponseWithUnknownSize(Response $response, string $contentType): array
+    {
+        $resource = $response->resource();
+        $body = '';
+
+        while (! feof($resource)) {
+            $body .= fread($resource, 8192);
+
+            if (strlen($body) > self::MAX_JSON_DECODE_BYTES) {
+                return $this->parseLargeJsonResource($resource, $contentType, null, $body);
+            }
+        }
+
+        fclose($resource);
+
+        return json_decode($body, true) ?? [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function parseLargeJsonResource(mixed $resource, string $contentType, ?int $responseSize, string $buffer = ''): array
+    {
+        return array_merge(
+            $this->extractJsonScalarValues($resource, self::LARGE_RESPONSE_JSON_KEYS, $buffer),
+            [
+                'response_omitted' => true,
+                'response_size' => $responseSize,
+                'content_type' => $contentType,
+                'message' => 'SEF returned a large response body that was not stored.',
+            ],
+        );
+    }
+
+    protected function getResponseBodySize(Response $response): ?int
+    {
+        $contentLength = $response->header('Content-Length');
+
+        if (is_numeric($contentLength)) {
+            return (int) $contentLength;
+        }
+
+        $size = $response->toPsrResponse()->getBody()->getSize();
+
+        return is_int($size) ? $size : null;
+    }
+
+    protected function getLimitedResponseBody(Response $response): string
+    {
+        $body = $response->body();
+
+        if (strlen($body) <= self::MAX_LOGGED_RESPONSE_BODY_BYTES) {
+            return $body;
+        }
+
+        return substr($body, 0, self::MAX_LOGGED_RESPONSE_BODY_BYTES)
+            .'... [truncated, total bytes: '.strlen($body).']';
+    }
+
+    /**
+     * @param  array<int, string>  $keys
+     * @return array<string, mixed>
+     */
+    protected function extractJsonScalarValues(mixed $resource, array $keys, string $buffer = ''): array
+    {
+        $values = [];
+        $pattern = $this->jsonScalarPattern($keys);
+
+        if ($buffer !== '') {
+            if (preg_match_all($pattern, $buffer, $matches, PREG_SET_ORDER)) {
+                foreach ($matches as $match) {
+                    $values[$match['key']] = $this->parseJsonScalarMatch($match);
+                }
+            }
+
+            $buffer = substr($buffer, -512);
+        }
+
+        while (! feof($resource)) {
+            $buffer .= fread($resource, 8192);
+
+            if (preg_match_all($pattern, $buffer, $matches, PREG_SET_ORDER)) {
+                foreach ($matches as $match) {
+                    $values[$match['key']] = $this->parseJsonScalarMatch($match);
+                }
+            }
+
+            if (count($values) === count($keys)) {
+                break;
+            }
+
+            $buffer = substr($buffer, -512);
+        }
+
+        fclose($resource);
+
+        return $values;
+    }
+
+    /**
+     * @param  array<int, string>  $keys
+     */
+    protected function jsonScalarPattern(array $keys): string
+    {
+        $escapedKeys = array_map(fn (string $key): string => preg_quote($key, '/'), $keys);
+
+        return '/"(?<key>'.implode('|', $escapedKeys).')"\\s*:\\s*(?:(?<number>-?\\d+(?:\\.\\d+)?)|"(?<string>(?:[^"\\\\]|\\\\.)*)"|(?<boolean>true|false)|(?<null>null))/i';
+    }
+
+    /**
+     * @param  array<string, string>  $match
+     */
+    protected function parseJsonScalarMatch(array $match): mixed
+    {
+        if (($match['number'] ?? '') !== '') {
+            return str_contains($match['number'], '.') ? (float) $match['number'] : (int) $match['number'];
+        }
+
+        if (($match['string'] ?? '') !== '') {
+            return json_decode('"'.$match['string'].'"', true);
+        }
+
+        if (($match['boolean'] ?? '') !== '') {
+            return $match['boolean'] === 'true';
+        }
+
+        return null;
     }
 
     /**
@@ -750,7 +927,7 @@ class SefService
 
         // Ensure XML declaration is present
         if (! str_starts_with($xmlContent, '<?xml')) {
-            $xmlContent = '<?xml version="1.0" encoding="UTF-8"?>' . "\n" . $xmlContent;
+            $xmlContent = '<?xml version="1.0" encoding="UTF-8"?>'."\n".$xmlContent;
         }
 
         // Log XML for debugging (first 500 chars)
@@ -774,11 +951,10 @@ class SefService
 
         $response = $this->request('POST', $endpoint, $options);
 
-        // Log full response for debugging
         Log::info('eFaktura send response details', [
-            'response' => $response,
+            'response' => $this->summarizeResponseForLog($response),
             'has_error' => isset($response['error']),
-            'sales_invoice_id' => $response['SalesInvoiceId'] ?? null,
+            'sales_invoice_id' => $response['SalesInvoiceId'] ?? $response['salesInvoiceId'] ?? null,
         ]);
 
         if (isset($response['error'])) {
@@ -786,6 +962,26 @@ class SefService
         }
 
         return $response;
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     * @return array<string, mixed>
+     */
+    protected function summarizeResponseForLog(array $response): array
+    {
+        if (! ($response['response_omitted'] ?? false)) {
+            return $response;
+        }
+
+        return [
+            'salesInvoiceId' => $response['salesInvoiceId'] ?? $response['SalesInvoiceId'] ?? null,
+            'invoiceId' => $response['invoiceId'] ?? $response['InvoiceId'] ?? null,
+            'requestId' => $response['requestId'] ?? $response['RequestId'] ?? null,
+            'response_omitted' => true,
+            'response_size' => $response['response_size'] ?? null,
+            'content_type' => $response['content_type'] ?? null,
+        ];
     }
 
     /**
