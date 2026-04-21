@@ -320,7 +320,10 @@ class EditInvoice extends EditRecord
                             'xml_content' => $xmlContent,
                         ]);
 
-                        $response = $sefService->sendInvoice($xmlContent, 'Yes');
+                        $response = $sefService->sendInvoice(
+                            $xmlContent,
+                            ! empty($this->record->client->jbkjs) ? 'Yes' : 'No',
+                        );
 
                         if (isset($response['error'])) {
                             // Update existing record or create new one

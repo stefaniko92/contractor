@@ -559,7 +559,10 @@ class InvoicesTable
                                     'xml_length' => strlen($xmlContent),
                                 ]);
 
-                                $response = $sefService->sendInvoice($xmlContent, 'Yes');
+                                $response = $sefService->sendInvoice(
+                                    $xmlContent,
+                                    ! empty($record->client->jbkjs) ? 'Yes' : 'No',
+                                );
 
                                 if (isset($response['error'])) {
                                     // Update existing record or create new one

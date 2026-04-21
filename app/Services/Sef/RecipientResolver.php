@@ -4,7 +4,6 @@ namespace App\Services\Sef;
 
 use App\Models\Client;
 use App\Services\SefService;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class RecipientResolver
@@ -19,37 +18,34 @@ class RecipientResolver
     /**
      * Resolve recipient data from SEF by PIB
      */
-    public function resolveByPib(string $pib): RecipientData
+    public function resolveByPib(string $pib, ?string $registrationNumber = null, ?string $jbkjs = null): RecipientData
     {
         // Strip RS prefix if present
         $pib = str_replace('RS', '', $pib);
 
-        // Try cache first (cache for 24 hours)
-        $cacheKey = "sef_recipient_{$pib}";
-        $cached = Cache::get($cacheKey);
-        if ($cached) {
-            return RecipientData::fromArray($cached);
+        $response = $this->sefService->searchCompanyByPib($pib, $registrationNumber, $jbkjs);
+
+        if (isset($response['error'])) {
+            return RecipientData::withError($pib, $response['error']);
         }
 
-        // Fetch from SEF
-        $companies = $this->fetchCompanies();
+        if ($response['requires_jbkjs'] ?? false) {
+            return RecipientData::requiresJbkjs($pib);
+        }
 
-        foreach ($companies as $company) {
-            if ($company['VatRegistrationCode'] === $pib) {
-                $data = new RecipientData(
-                    vatNumber: $pib,
-                    name: $company['Name'] ?? '',
-                    registrationCode: $company['RegistrationCode'] ?? null,
-                    jbkjs: $company['BugetCompanyNumber'] ?? null,
-                    isBudgetUser: !empty($company['BugetCompanyNumber']),
-                    isRegistered: true
-                );
+        if ($response['is_registered'] ?? false) {
+            $company = $response['companies'][0] ?? [];
 
-                // Cache the result
-                Cache::put($cacheKey, $data->toArray(), 86400);
-
-                return $data;
-            }
+            return new RecipientData(
+                vatNumber: $pib,
+                name: $company['name'] ?? '',
+                registrationCode: $company['registration_number'] ?? $registrationNumber,
+                jbkjs: $company['jbkjs'] ?? $jbkjs,
+                isBudgetUser: ! empty($company['jbkjs'] ?? $jbkjs),
+                isRegistered: true,
+                requiresJbkjs: false,
+                error: null
+            );
         }
 
         // Not found in SEF
@@ -59,7 +55,9 @@ class RecipientResolver
             registrationCode: null,
             jbkjs: null,
             isBudgetUser: false,
-            isRegistered: false
+            isRegistered: false,
+            requiresJbkjs: false,
+            error: null
         );
     }
 
@@ -68,16 +66,29 @@ class RecipientResolver
      */
     public function updateClientFromSef(Client $client): void
     {
-        if (!$client->tax_id) {
+        if (! $client->tax_id) {
             return;
         }
 
-        $recipientData = $this->resolveByPib($client->tax_id);
+        $recipientData = $this->resolveByPib($client->tax_id, $client->registration_number, $client->jbkjs);
+
+        if ($recipientData->error || $recipientData->requiresJbkjs) {
+            $client->update([
+                'efaktura_verified' => true,
+                'efaktura_verified_at' => now(),
+                'efaktura_status' => 'error',
+                'efaktura_verification_error' => $recipientData->error
+                    ?? 'Klijent je budžetski korisnik. Unesite JBKJS pre slanja na SEF.',
+            ]);
+
+            return;
+        }
 
         if ($recipientData->isRegistered) {
             $client->update([
-                'jbkjs' => $recipientData->jbkjs,
+                'jbkjs' => $recipientData->jbkjs ?: $client->jbkjs,
                 'registration_number' => $recipientData->registrationCode ?: $client->registration_number,
+                'efaktura_verified' => true,
                 'efaktura_status' => 'active',
                 'efaktura_verified_at' => now(),
                 'efaktura_verification_error' => null,
@@ -93,48 +104,13 @@ class RecipientResolver
     }
 
     /**
-     * Fetch all companies from SEF
-     */
-    private function fetchCompanies(): array
-    {
-        // Cache the entire list for 6 hours
-        return Cache::remember('sef_all_companies', 21600, function () {
-            $response = $this->sefService->getAllCompanies();
-
-            if (isset($response['error'])) {
-                Log::error('Failed to fetch SEF companies', ['error' => $response['error']]);
-                return [];
-            }
-
-            // Convert DTOs back to arrays for caching
-            $companies = [];
-            foreach ($response['companies'] ?? [] as $company) {
-                if (is_object($company)) {
-                    $companies[] = [
-                        'VatRegistrationCode' => $company->getPib(),
-                        'Name' => $company->name,
-                        'RegistrationCode' => property_exists($company, 'registrationCode') ? $company->registrationCode : null,
-                        'BugetCompanyNumber' => property_exists($company, 'bugetCompanyNumber') ? $company->bugetCompanyNumber : null,
-                    ];
-                } else {
-                    $companies[] = $company;
-                }
-            }
-
-            return $companies;
-        });
-    }
-
-    /**
      * Clear cache for a specific PIB
      */
     public function clearCache(?string $pib = null): void
     {
-        if ($pib) {
-            Cache::forget("sef_recipient_{$pib}");
-        } else {
-            Cache::forget('sef_all_companies');
-        }
+        Log::debug('SEF recipient cache clear requested, but recipient lookups are no longer cached.', [
+            'pib' => $pib,
+        ]);
     }
 }
 
@@ -149,8 +125,38 @@ class RecipientData
         public readonly ?string $registrationCode,
         public readonly ?string $jbkjs,
         public readonly bool $isBudgetUser,
-        public readonly bool $isRegistered
+        public readonly bool $isRegistered,
+        public readonly bool $requiresJbkjs = false,
+        public readonly ?string $error = null,
     ) {}
+
+    public static function requiresJbkjs(string $vatNumber): self
+    {
+        return new self(
+            vatNumber: $vatNumber,
+            name: '',
+            registrationCode: null,
+            jbkjs: null,
+            isBudgetUser: true,
+            isRegistered: false,
+            requiresJbkjs: true,
+            error: null
+        );
+    }
+
+    public static function withError(string $vatNumber, string $error): self
+    {
+        return new self(
+            vatNumber: $vatNumber,
+            name: '',
+            registrationCode: null,
+            jbkjs: null,
+            isBudgetUser: false,
+            isRegistered: false,
+            requiresJbkjs: false,
+            error: $error
+        );
+    }
 
     public function toArray(): array
     {
@@ -161,6 +167,8 @@ class RecipientData
             'jbkjs' => $this->jbkjs,
             'isBudgetUser' => $this->isBudgetUser,
             'isRegistered' => $this->isRegistered,
+            'requiresJbkjs' => $this->requiresJbkjs,
+            'error' => $this->error,
         ];
     }
 
@@ -172,7 +180,9 @@ class RecipientData
             registrationCode: $data['registrationCode'],
             jbkjs: $data['jbkjs'],
             isBudgetUser: $data['isBudgetUser'],
-            isRegistered: $data['isRegistered']
+            isRegistered: $data['isRegistered'],
+            requiresJbkjs: $data['requiresJbkjs'] ?? false,
+            error: $data['error'] ?? null
         );
     }
 }

@@ -170,6 +170,83 @@ class SefServiceTest extends TestCase
         $this->assertArrayNotHasKey('padding', $response);
     }
 
+    #[Test]
+    public function it_ignores_non_company_values_in_company_responses(): void
+    {
+        SefEfakturaSetting::factory()->create([
+            'user_id' => $this->user->id,
+            'is_enabled' => true,
+            'api_key' => 'test-api-key',
+        ]);
+
+        Http::fake([
+            '*' => Http::response([
+                true,
+                [
+                    'Id' => 123,
+                    'Name' => 'Test Company',
+                    'PIB' => '123456789',
+                    'IsSefEnabled' => true,
+                ],
+            ]),
+        ]);
+
+        $response = SefService::forUser($this->user->id)->getAllCompanies();
+
+        $this->assertCount(1, $response['companies']);
+        $this->assertSame('Test Company', $response['companies'][0]->name);
+        $this->assertSame('123456789', $response['companies'][0]->pib);
+    }
+
+    #[Test]
+    public function it_sends_jbkjs_when_checking_a_budget_company_registration(): void
+    {
+        SefEfakturaSetting::factory()->create([
+            'user_id' => $this->user->id,
+            'is_enabled' => true,
+            'api_key' => 'test-api-key',
+        ]);
+
+        Http::fake([
+            '*' => Http::response([
+                'eFakturaRegisteredCompany' => true,
+            ]),
+        ]);
+
+        $response = SefService::forUser($this->user->id)
+            ->checkIfCompanyRegisteredOnEfaktura('108213413', '17862146', '10520');
+
+        $this->assertTrue($response['eFakturaRegisteredCompany']);
+
+        Http::assertSent(function ($request): bool {
+            return $request['vatNumber'] === '108213413'
+                && $request['registrationNumber'] === '17862146'
+                && $request['jbkjs'] === '10520';
+        });
+    }
+
+    #[Test]
+    public function it_requires_jbkjs_when_sef_reports_that_pib_belongs_to_a_budget_user(): void
+    {
+        SefEfakturaSetting::factory()->create([
+            'user_id' => $this->user->id,
+            'is_enabled' => true,
+            'api_key' => 'test-api-key',
+        ]);
+
+        Http::fake([
+            '*' => Http::response('CompanyWithVATRegistrationCodeIsBudgetUser', 400, [
+                'Content-Type' => 'text/plain',
+            ]),
+        ]);
+
+        $response = SefService::forUser($this->user->id)->searchCompanyByPib('108213413');
+
+        $this->assertFalse($response['is_registered']);
+        $this->assertTrue($response['requires_jbkjs']);
+        $this->assertSame([], $response['companies']);
+    }
+
     /** @test */
     public function it_handles_multiple_users_independently()
     {

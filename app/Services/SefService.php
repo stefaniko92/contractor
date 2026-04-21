@@ -657,17 +657,75 @@ class SefService
             return $response;
         }
 
-        // Convert to DTOs if we have data
-        if (is_array($response)) {
-            $companies = [];
-            foreach ($response as $companyData) {
-                $companies[] = MiniCompanyDto::fromArray($companyData);
-            }
+        return $this->formatCompaniesResponse($response);
+    }
 
-            return ['companies' => $companies];
+    /**
+     * @param  array<string|int, mixed>  $response
+     * @return array{companies: array<int, MiniCompanyDto>}
+     */
+    protected function formatCompaniesResponse(array $response): array
+    {
+        $companyRows = $this->extractCompanyRows($response);
+
+        if ($companyRows === [] && $response !== []) {
+            Log::warning('SEF companies response did not contain company rows', [
+                'response_keys' => array_keys($response),
+            ]);
         }
 
-        return $response;
+        return [
+            'companies' => array_map(
+                fn (array $companyData): MiniCompanyDto => MiniCompanyDto::fromArray($companyData),
+                $companyRows,
+            ),
+        ];
+    }
+
+    /**
+     * @param  array<string|int, mixed>  $response
+     * @return array<int, array<string, mixed>>
+     */
+    protected function extractCompanyRows(array $response): array
+    {
+        if (array_is_list($response)) {
+            return array_values(array_filter($response, 'is_array'));
+        }
+
+        foreach (['companies', 'Companies', 'items', 'Items', 'data', 'Data', 'result', 'Result'] as $key) {
+            if (! isset($response[$key]) || ! is_array($response[$key])) {
+                continue;
+            }
+
+            if (array_is_list($response[$key])) {
+                return array_values(array_filter($response[$key], 'is_array'));
+            }
+
+            if ($this->isCompanyPayload($response[$key])) {
+                return [$response[$key]];
+            }
+        }
+
+        if ($this->isCompanyPayload($response)) {
+            return [$response];
+        }
+
+        return [];
+    }
+
+    /**
+     * @param  array<string|int, mixed>  $payload
+     */
+    protected function isCompanyPayload(array $payload): bool
+    {
+        return array_intersect([
+            'Id',
+            'TaxIdentifier',
+            'Name',
+            'PIB',
+            'VatRegistrationCode',
+            'RegistrationCode',
+        ], array_keys($payload)) !== [];
     }
 
     /**
@@ -747,11 +805,21 @@ class SefService
      * Check if a company is registered on eFaktura using the official API endpoint.
      * This is the correct way to verify companies according to SEF API documentation.
      */
-    public function checkIfCompanyRegisteredOnEfaktura(string $pib): array
+    public function checkIfCompanyRegisteredOnEfaktura(string $pib, ?string $registrationNumber = null, ?string $jbkjs = null): array
     {
-        $response = $this->post('publicApi/Company/CheckIfCompanyRegisteredOnEfaktura', [
+        $payload = [
             'vatNumber' => $pib,
-        ]);
+        ];
+
+        if ($registrationNumber) {
+            $payload['registrationNumber'] = $registrationNumber;
+        }
+
+        if ($jbkjs) {
+            $payload['jbkjs'] = $jbkjs;
+        }
+
+        $response = $this->post('publicApi/Company/CheckIfCompanyRegisteredOnEfaktura', $payload);
 
         if (isset($response['error'])) {
             return $response;
@@ -765,9 +833,9 @@ class SefService
      * Check if a company exists in SEF system by tax identifier (PIB).
      * Uses the new official endpoint instead of fetching all companies.
      */
-    public function checkCompanyExistsByPib(string $pib): array
+    public function checkCompanyExistsByPib(string $pib, ?string $registrationNumber = null, ?string $jbkjs = null): array
     {
-        $response = $this->checkIfCompanyRegisteredOnEfaktura($pib);
+        $response = $this->checkIfCompanyRegisteredOnEfaktura($pib, $registrationNumber, $jbkjs);
 
         if (isset($response['error'])) {
             // Check if it's a budget user error (which means the company exists!)
@@ -776,12 +844,12 @@ class SefService
                                  str_contains($response['response_body'], 'CompanyWithVATRegistrationCodeIsBudgetUser');
 
             if ($isBudgetUserError) {
-                // Budget users exist in SEF but need special handling
                 return [
-                    'exists' => true,
+                    'exists' => false,
+                    'requires_jbkjs' => true,
                     'is_budget_user' => true,
-                    'company' => ['pib' => $pib, 'type' => 'budget_user'],
-                    'message' => 'Kompanija je pronađena - budžetski korisnik (javna ustanova)',
+                    'company' => null,
+                    'message' => 'Kompanija je budžetski korisnik. Unesite JBKJS za proveru i slanje u CIR.',
                 ];
             }
 
@@ -794,14 +862,22 @@ class SefService
         if ($isRegistered) {
             return [
                 'exists' => true,
-                'is_budget_user' => false,
-                'company' => $response,
+                'requires_jbkjs' => false,
+                'is_budget_user' => ! empty($jbkjs),
+                'company' => [
+                    'pib' => $pib,
+                    'registration_number' => $registrationNumber,
+                    'jbkjs' => $jbkjs,
+                    'type' => $jbkjs ? 'budget_user' : 'company',
+                    'response' => $response,
+                ],
                 'message' => 'Kompanija je pronađena i aktivna u SEF sistemu',
             ];
         }
 
         return [
             'exists' => false,
+            'requires_jbkjs' => false,
             'company' => null,
             'message' => 'Kompanija nije pronađena ili nije aktivna u SEF sistemu',
         ];
@@ -811,9 +887,9 @@ class SefService
      * Search for a company by PIB in SEF system.
      * Returns array with companies key for consistency with verification command.
      */
-    public function searchCompanyByPib(string $pib): array
+    public function searchCompanyByPib(string $pib, ?string $registrationNumber = null, ?string $jbkjs = null): array
     {
-        $result = $this->checkCompanyExistsByPib($pib);
+        $result = $this->checkCompanyExistsByPib($pib, $registrationNumber, $jbkjs);
 
         if (isset($result['error'])) {
             return $result;
@@ -830,6 +906,7 @@ class SefService
         return [
             'companies' => [],
             'is_registered' => false,
+            'requires_jbkjs' => $result['requires_jbkjs'] ?? false,
         ];
     }
 

@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Invoice;
-use App\Services\Sef\RecipientResolver;
 use App\Services\Sef\VatProfileResolver;
 use DOMDocument;
 use DOMElement;
@@ -17,7 +16,7 @@ use DOMElement;
 class UblXmlGenerator
 {
     private DOMDocument $doc;
-    private ?RecipientResolver $recipientResolver = null;
+
     private ?VatProfileResolver $vatProfileResolver = null;
 
     private string $namespaceURI = 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2';
@@ -43,7 +42,6 @@ class UblXmlGenerator
     {
         try {
             $sefService = SefService::forUser($invoice->user_id);
-            $this->recipientResolver = new RecipientResolver($sefService);
             $this->vatProfileResolver = new VatProfileResolver($sefService);
         } catch (\Exception $e) {
             \Log::warning('Could not initialize SEF resolvers', [
@@ -63,12 +61,6 @@ class UblXmlGenerator
 
         // Initialize resolvers
         $this->initializeResolvers($invoice);
-
-        // Update client with SEF data if needed
-        if ($this->recipientResolver && $invoice->client->tax_id) {
-            $this->recipientResolver->updateClientFromSef($invoice->client);
-            $invoice->client->refresh();
-        }
 
         // Create root Invoice element
         $root = $this->createRootElement();
@@ -228,7 +220,7 @@ class UblXmlGenerator
 
         // Check if client is a budget user (government entity)
         // Budget users are identified by having a JBKJS code
-        $isBudgetUser = !empty($client->jbkjs);
+        $isBudgetUser = ! empty($client->jbkjs);
 
         // EndpointID with PIB (required for all eFaktura-registered customers)
         if ($client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass || $isBudgetUser)) {
@@ -242,7 +234,7 @@ class UblXmlGenerator
             $partyIdentification = $this->createElement($party, 'cac:PartyIdentification');
             $idElement = $this->createElement($partyIdentification, 'cbc:ID');
             // Format: "JBKJS:xxxxx" without schemeID attribute
-            $idElement->nodeValue = htmlspecialchars('JBKJS:' . $client->jbkjs, ENT_XML1, 'UTF-8');
+            $idElement->nodeValue = htmlspecialchars('JBKJS:'.$client->jbkjs, ENT_XML1, 'UTF-8');
         }
 
         // Party Name
@@ -461,7 +453,7 @@ class UblXmlGenerator
      */
     private function resolveVatProfile(Invoice $invoice): \App\Services\Sef\VatProfile
     {
-        if (!$this->vatProfileResolver) {
+        if (! $this->vatProfileResolver) {
             // Fallback if resolvers not initialized
             return new \App\Services\Sef\VatProfile(
                 categoryId: 'O',
