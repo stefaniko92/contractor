@@ -92,8 +92,13 @@ class EditClient extends EditRecord
                             return;
                         }
 
-                        // Search for company by PIB
-                        $result = $sefService->searchCompanyByPib($this->record->tax_id);
+                        // Use RecipientResolver to fetch and update client data
+                        $recipientResolver = new \App\Services\Sef\RecipientResolver($sefService);
+                        $recipientResolver->updateClientFromSef($this->record);
+                        $this->record->refresh();
+
+                        // Check if client was found
+                        $result = ['is_registered' => $this->record->efaktura_status === 'active'];
 
                         if (isset($result['error'])) {
                             // API error - likely 404 on production
@@ -127,20 +132,13 @@ class EditClient extends EditRecord
                                 'tax_id' => $this->record->tax_id,
                                 'error' => $errorMessage,
                             ]);
-                        } elseif (! empty($result['companies']) || ($result['exists'] ?? false)) {
-                            // Company found (regular or budget user)
-                            $isBudgetUser = $result['is_budget_user'] ?? false;
-
-                            $this->record->update([
-                                'efaktura_verified' => true,
-                                'efaktura_verified_at' => now(),
-                                'efaktura_status' => 'active',
-                                'efaktura_verification_error' => $isBudgetUser ? 'Budžetski korisnik (javna ustanova)' : null,
-                            ]);
+                        } elseif ($this->record->efaktura_status === 'active') {
+                            // Company found and updated by RecipientResolver
+                            $isBudgetUser = !empty($this->record->jbkjs);
 
                             $message = $isBudgetUser
-                                ? "Klijent \"{$this->record->company_name}\" je budžetski korisnik (javna ustanova). Možete mu slati fakture - napomena: potrebno je koristiti 'SendToCir' opciju pri slanju."
-                                : "Klijent \"{$this->record->company_name}\" postoji u eFaktura sistemu i možete mu slati fakture.";
+                                ? "Klijent \"{$this->record->company_name}\" je budžetski korisnik (JBKJS: {$this->record->jbkjs}). JBKJS je automatski popunjen."
+                                : "Klijent \"{$this->record->company_name}\" postoji u eFaktura sistemu.";
 
                             Notification::make()
                                 ->title('Klijent pronađen!')
@@ -153,6 +151,7 @@ class EditClient extends EditRecord
                                 'tax_id' => $this->record->tax_id,
                                 'company_name' => $this->record->company_name,
                                 'is_budget_user' => $isBudgetUser,
+                                'jbkjs' => $this->record->jbkjs,
                             ]);
                         } else {
                             // Company not found

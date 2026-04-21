@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Invoice;
+use App\Services\Sef\RecipientResolver;
+use App\Services\Sef\VatProfileResolver;
 use DOMDocument;
 use DOMElement;
 
@@ -15,6 +17,8 @@ use DOMElement;
 class UblXmlGenerator
 {
     private DOMDocument $doc;
+    private ?RecipientResolver $recipientResolver = null;
+    private ?VatProfileResolver $vatProfileResolver = null;
 
     private string $namespaceURI = 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2';
 
@@ -33,12 +37,38 @@ class UblXmlGenerator
     }
 
     /**
+     * Initialize service resolvers
+     */
+    private function initializeResolvers(Invoice $invoice): void
+    {
+        try {
+            $sefService = SefService::forUser($invoice->user_id);
+            $this->recipientResolver = new RecipientResolver($sefService);
+            $this->vatProfileResolver = new VatProfileResolver($sefService);
+        } catch (\Exception $e) {
+            \Log::warning('Could not initialize SEF resolvers', [
+                'invoice_id' => $invoice->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * Generate UBL XML for an invoice
      */
     public function generate(Invoice $invoice): string
     {
         // Load relationships
         $invoice->load(['user.userCompany', 'client', 'items', 'bankAccount']);
+
+        // Initialize resolvers
+        $this->initializeResolvers($invoice);
+
+        // Update client with SEF data if needed
+        if ($this->recipientResolver && $invoice->client->tax_id) {
+            $this->recipientResolver->updateClientFromSef($invoice->client);
+            $invoice->client->refresh();
+        }
 
         // Create root Invoice element
         $root = $this->createRootElement();
@@ -200,57 +230,19 @@ class UblXmlGenerator
         // Budget users are identified by having a JBKJS code
         $isBudgetUser = !empty($client->jbkjs);
 
-        // Log budget user detection for debugging
-        \Log::info('Customer Party Budget User Detection', [
-            'invoice_id' => $invoice->id,
-            'client_id' => $client->id,
-            'client_pib' => $client->tax_id,
-            'client_jbkjs' => $client->jbkjs,
-            'is_budget_user' => $isBudgetUser,
-            'efaktura_status' => $client->efaktura_status,
-            'allow_bypass' => $client->allow_efaktura_bypass,
-        ]);
-
-        // Endpoint ID (required for all customers registered in eFaktura system)
-        // Both regular and budget users need EndpointID with PIB
-        $shouldAddEndpointId = $client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass || $isBudgetUser);
-
-        \Log::info('EndpointID decision', [
-            'invoice_id' => $invoice->id,
-            'has_tax_id' => !empty($client->tax_id),
-            'tax_id_value' => $client->tax_id,
-            'efaktura_status' => $client->efaktura_status,
-            'allow_bypass' => $client->allow_efaktura_bypass,
-            'is_budget_user' => $isBudgetUser,
-            'should_add_endpoint_id' => $shouldAddEndpointId,
-        ]);
-
-        if ($shouldAddEndpointId) {
+        // EndpointID with PIB (required for all eFaktura-registered customers)
+        if ($client->tax_id && ($client->efaktura_status === 'active' || $client->allow_efaktura_bypass || $isBudgetUser)) {
             $endpointID = $this->createElement($party, 'cbc:EndpointID');
-            $endpointID->setAttribute('schemeID', '9948'); // Required by SEF API
+            $endpointID->setAttribute('schemeID', '9948');
             $endpointID->nodeValue = htmlspecialchars($client->tax_id, ENT_XML1, 'UTF-8');
-
-            \Log::info('Added EndpointID for customer', [
-                'invoice_id' => $invoice->id,
-                'endpoint_id' => $client->tax_id,
-                'scheme_id' => '9948',
-            ]);
         }
 
-        // PartyIdentification (ONLY for budget users - government entities)
-        // Budget users MUST have PartyIdentification with JBKJS in format "JBKJS:xxxxx"
-        // NO schemeID attribute for PartyIdentification/ID!
-        if ($isBudgetUser) {
+        // PartyIdentification with JBKJS (ONLY for budget users)
+        if ($isBudgetUser && $client->jbkjs) {
             $partyIdentification = $this->createElement($party, 'cac:PartyIdentification');
             $idElement = $this->createElement($partyIdentification, 'cbc:ID');
-            // NO schemeID attribute! Format must be "JBKJS:xxxxx"
+            // Format: "JBKJS:xxxxx" without schemeID attribute
             $idElement->nodeValue = htmlspecialchars('JBKJS:' . $client->jbkjs, ENT_XML1, 'UTF-8');
-
-            \Log::info('Added PartyIdentification for budget user', [
-                'invoice_id' => $invoice->id,
-                'jbkjs_value' => 'JBKJS:' . $client->jbkjs,
-                'note' => 'No schemeID attribute for budget users',
-            ]);
         }
 
         // Party Name
@@ -343,31 +335,42 @@ class UblXmlGenerator
      */
     private function addTaxTotal(DOMElement $parent, Invoice $invoice): void
     {
+        // Resolve VAT profile for this invoice
+        $vatProfile = $this->resolveVatProfile($invoice);
+
         $taxTotal = $this->createElement($parent, 'cac:TaxTotal');
 
-        // For Serbian flat-tax entrepreneurs (paušalci), there's no VAT
-        // Tax amount is 0
-        $taxAmount = $this->createElement($taxTotal, 'cbc:TaxAmount');
-        $taxAmount->setAttribute('currencyID', $invoice->currency ?? 'RSD');
-        $taxAmount->nodeValue = '0.00';
+        // Calculate tax amount based on profile
+        $taxableAmount = (float) $invoice->amount;
+        $taxAmount = $taxableAmount * ($vatProfile->percent / 100);
+
+        $taxAmountElement = $this->createElement($taxTotal, 'cbc:TaxAmount');
+        $taxAmountElement->setAttribute('currencyID', $invoice->currency ?? 'RSD');
+        $taxAmountElement->nodeValue = number_format($taxAmount, 2, '.', '');
 
         // Tax Subtotal
         $taxSubtotal = $this->createElement($taxTotal, 'cac:TaxSubtotal');
 
-        $taxableAmount = $this->createElement($taxSubtotal, 'cbc:TaxableAmount');
-        $taxableAmount->setAttribute('currencyID', $invoice->currency ?? 'RSD');
-        $taxableAmount->nodeValue = number_format($invoice->amount, 2, '.', '');
+        $taxableAmountElement = $this->createElement($taxSubtotal, 'cbc:TaxableAmount');
+        $taxableAmountElement->setAttribute('currencyID', $invoice->currency ?? 'RSD');
+        $taxableAmountElement->nodeValue = number_format($taxableAmount, 2, '.', '');
 
-        $taxAmountSub = $this->createElement($taxSubtotal, 'cbc:TaxAmount');
-        $taxAmountSub->setAttribute('currencyID', $invoice->currency ?? 'RSD');
-        $taxAmountSub->nodeValue = '0.00';
+        $taxAmountSubElement = $this->createElement($taxSubtotal, 'cbc:TaxAmount');
+        $taxAmountSubElement->setAttribute('currencyID', $invoice->currency ?? 'RSD');
+        $taxAmountSubElement->nodeValue = number_format($taxAmount, 2, '.', '');
 
-        // Tax Category
+        // Tax Category (using resolved profile)
         $taxCategory = $this->createElement($taxSubtotal, 'cac:TaxCategory');
-        $this->addElement($taxCategory, 'cbc:ID', 'Z'); // Z = Zero-rated
-        $this->addElement($taxCategory, 'cbc:Percent', '0');
+        $this->addElement($taxCategory, 'cbc:ID', $vatProfile->categoryId);
+        $this->addElement($taxCategory, 'cbc:Percent', (string) $vatProfile->percent);
 
-        // Paušalci use zero-rated category (0% VAT rate)
+        // Add exemption reason if required
+        if ($vatProfile->exemptionReasonCode) {
+            $this->addElement($taxCategory, 'cbc:TaxExemptionReasonCode', $vatProfile->exemptionReasonCode);
+        }
+        if ($vatProfile->exemptionReasonText) {
+            $this->addElement($taxCategory, 'cbc:TaxExemptionReason', $vatProfile->exemptionReasonText);
+        }
 
         $taxScheme = $this->createElement($taxCategory, 'cac:TaxScheme');
         $this->addElement($taxScheme, 'cbc:ID', 'VAT');
@@ -409,6 +412,9 @@ class UblXmlGenerator
      */
     private function addInvoiceLines(DOMElement $parent, Invoice $invoice): void
     {
+        // Resolve VAT profile once for all lines (must match TaxTotal)
+        $vatProfile = $this->resolveVatProfile($invoice);
+
         $lineNumber = 1;
 
         foreach ($invoice->items as $item) {
@@ -432,10 +438,10 @@ class UblXmlGenerator
             $this->addElement($itemElement, 'cbc:Description', $item->description ?? $item->title);
             $this->addElement($itemElement, 'cbc:Name', $item->title);
 
-            // Classified Tax Category
+            // Classified Tax Category (must match TaxTotal category)
             $classifiedTaxCategory = $this->createElement($itemElement, 'cac:ClassifiedTaxCategory');
-            $this->addElement($classifiedTaxCategory, 'cbc:ID', 'Z'); // Z = Zero-rated
-            $this->addElement($classifiedTaxCategory, 'cbc:Percent', '0');
+            $this->addElement($classifiedTaxCategory, 'cbc:ID', $vatProfile->categoryId);
+            $this->addElement($classifiedTaxCategory, 'cbc:Percent', (string) $vatProfile->percent);
 
             $taxScheme = $this->createElement($classifiedTaxCategory, 'cac:TaxScheme');
             $this->addElement($taxScheme, 'cbc:ID', 'VAT');
@@ -448,6 +454,31 @@ class UblXmlGenerator
 
             $lineNumber++;
         }
+    }
+
+    /**
+     * Resolve VAT profile for an invoice
+     */
+    private function resolveVatProfile(Invoice $invoice): \App\Services\Sef\VatProfile
+    {
+        if (!$this->vatProfileResolver) {
+            // Fallback if resolvers not initialized
+            return new \App\Services\Sef\VatProfile(
+                categoryId: 'O',
+                percent: 0,
+                exemptionReasonCode: null,
+                exemptionReasonText: null,
+                description: 'Paušalno oporezivanje'
+            );
+        }
+
+        // Context for VAT resolution
+        $context = [
+            'is_pausalni' => true, // Assume paušalci for now
+            'vat_rate' => 0,
+        ];
+
+        return $this->vatProfileResolver->resolveForInvoice($context);
     }
 
     /**
