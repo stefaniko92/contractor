@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\SefEfakturaSetting;
 use App\Models\User;
+use App\Services\Sef\VatProfileResolver;
 use App\Services\SefService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -245,6 +246,37 @@ class SefServiceTest extends TestCase
         $this->assertFalse($response['is_registered']);
         $this->assertTrue($response['requires_jbkjs']);
         $this->assertSame([], $response['companies']);
+    }
+
+    #[Test]
+    public function it_uses_configured_vat_exemption_reason_for_pausalni_invoices(): void
+    {
+        SefEfakturaSetting::factory()->create([
+            'user_id' => $this->user->id,
+            'is_enabled' => true,
+            'api_key' => 'test-api-key',
+            'default_vat_exemption' => 'PDV-RS-33',
+            'default_vat_category' => 'SS',
+        ]);
+
+        Http::fake([
+            '*' => Http::response([
+                [
+                    'reasonId' => 33,
+                    'key' => 'PDV-RS-33',
+                    'text' => 'Mali poreski obveznik.',
+                    'activeFrom' => '2021-01-01T00:00:00.0000000+00:00',
+                    'category' => 'SS',
+                ],
+            ]),
+        ]);
+
+        $resolver = new VatProfileResolver(SefService::forUser($this->user->id));
+        $profile = $resolver->resolveForInvoice(['is_pausalni' => true]);
+
+        $this->assertSame('SS', $profile->categoryId);
+        $this->assertSame('PDV-RS-33', $profile->exemptionReasonCode);
+        $this->assertSame('Mali poreski obveznik.', $profile->exemptionReasonText);
     }
 
     /** @test */

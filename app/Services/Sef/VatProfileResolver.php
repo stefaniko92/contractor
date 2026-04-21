@@ -13,10 +13,10 @@ class VatProfileResolver
     // VAT profiles for different scenarios
     private const PROFILES = [
         'pausalni' => [
-            'category_id' => 'O', // Outside scope of VAT
+            'category_id' => 'SS',
             'percent' => 0,
             'needs_exemption_reason' => true,
-            'default_exemption_code' => 'PDV-RS-PAUSALNI',
+            'default_exemption_code' => 'PDV-RS-33',
             'description' => 'Paušalno oporezivanje - nije obveznik PDV',
         ],
         'standard_20' => [
@@ -84,27 +84,26 @@ class VatProfileResolver
     {
         $profile = self::PROFILES[$key] ?? self::PROFILES['pausalni'];
 
-        $exemptionReasons = [];
+        $exemptionCode = null;
+        $exemptionText = null;
+
         if ($profile['needs_exemption_reason']) {
             $exemptionReasons = $this->getExemptionReasons();
-
-            // Find the matching exemption reason
-            $exemptionCode = $profile['default_exemption_code'] ?? '';
+            $exemptionCode = $this->sefService->getDefaultVatExemption()
+                ?: ($profile['default_exemption_code'] ?? '');
             $exemptionText = $profile['description'];
 
             // Try to find official SEF exemption reason
             foreach ($exemptionReasons as $reason) {
-                if (str_contains($reason['code'] ?? '', 'pausal') ||
-                    str_contains($reason['description'] ?? '', 'pausal')) {
-                    $exemptionCode = $reason['code'];
-                    $exemptionText = $reason['description'];
+                if (($reason['code'] ?? null) === $exemptionCode) {
+                    $exemptionText = $reason['description'] ?? $exemptionText;
                     break;
                 }
             }
         }
 
         return new VatProfile(
-            categoryId: $profile['category_id'],
+            categoryId: $this->sefService->getDefaultVatCategory() ?: $profile['category_id'],
             percent: $profile['percent'],
             exemptionReasonCode: $profile['needs_exemption_reason'] ? $exemptionCode : null,
             exemptionReasonText: $profile['needs_exemption_reason'] ? $exemptionText : null,
@@ -122,6 +121,7 @@ class VatProfileResolver
 
             if (isset($response['error'])) {
                 Log::error('Failed to fetch VAT exemption reasons', ['error' => $response['error']]);
+
                 return [];
             }
 
@@ -149,7 +149,7 @@ class VatProfileResolver
         $errors = [];
 
         // Category S must have 10% or 20% rate
-        if ($profile->categoryId === 'S' && !in_array($profile->percent, [10, 20])) {
+        if ($profile->categoryId === 'S' && ! in_array($profile->percent, [10, 20])) {
             $errors[] = 'Category S requires 10% or 20% VAT rate';
         }
 
@@ -168,7 +168,7 @@ class VatProfileResolver
                     break;
                 }
             }
-            if (!$found) {
+            if (! $found) {
                 Log::warning('VAT exemption code not found in SEF list', [
                     'code' => $profile->exemptionReasonCode,
                     'available_codes' => array_column($validReasons, 'code'),

@@ -22,14 +22,14 @@ class ValueAddedTaxExemptionReasonDto
     public static function fromArray(array $data): self
     {
         return new self(
-            id: $data['Id'] ?? null,
-            code: $data['Code'] ?? null,
-            description: $data['Description'] ?? null,
-            shortDescription: $data['ShortDescription'] ?? null,
+            id: (string) ($data['reasonId'] ?? $data['ReasonId'] ?? $data['Id'] ?? ''),
+            code: $data['key'] ?? $data['Key'] ?? $data['Code'] ?? null,
+            description: $data['text'] ?? $data['Text'] ?? $data['Description'] ?? null,
+            shortDescription: $data['freeFormNote'] ?? $data['FreeFormNote'] ?? $data['ShortDescription'] ?? null,
             isActive: $data['IsActive'] ?? null,
-            validFrom: $data['ValidFrom'] ?? null,
-            validTo: $data['ValidTo'] ?? null,
-            legalBasis: $data['LegalBasis'] ?? null,
+            validFrom: $data['activeFrom'] ?? $data['ActiveFrom'] ?? $data['ValidFrom'] ?? null,
+            validTo: $data['activeTo'] ?? $data['ActiveTo'] ?? $data['ValidTo'] ?? null,
+            legalBasis: $data['law'] ?? $data['Law'] ?? $data['LegalBasis'] ?? null,
             sortOrder: $data['SortOrder'] ?? null,
         );
     }
