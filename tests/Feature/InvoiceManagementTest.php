@@ -8,6 +8,7 @@ use App\Filament\Resources\Invoices\Pages\ListInvoices;
 use App\Models\BankAccount;
 use App\Models\Client;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\User;
 use App\Models\UserCompany;
 use Filament\Facades\Filament;
@@ -113,6 +114,24 @@ class InvoiceManagementTest extends TestCase
         ]);
     }
 
+    public function test_budget_user_invoice_ubl_includes_order_reference(): void
+    {
+        $client = $this->createClient([
+            'jbkjs' => '80596',
+            'efaktura_verified' => true,
+            'efaktura_status' => 'active',
+        ]);
+        $invoice = $this->createInvoice($client, [
+            'invoice_number' => '14/2025',
+        ]);
+        $this->createInvoiceItem($invoice);
+
+        $xml = $invoice->generateUblXml();
+
+        $this->assertStringContainsString('<cac:OrderReference>', $xml);
+        $this->assertStringContainsString('<cbc:ID>14/2025</cbc:ID>', $xml);
+    }
+
     protected function createClient(array $attributes = []): Client
     {
         return Client::create(array_merge([
@@ -154,6 +173,20 @@ class InvoiceManagementTest extends TestCase
             'invoice_document_type' => 'faktura',
             'bank_account_id' => null,
             'is_storno' => false,
+        ], $attributes));
+    }
+
+    protected function createInvoiceItem(Invoice $invoice, array $attributes = []): InvoiceItem
+    {
+        return InvoiceItem::create(array_merge([
+            'invoice_id' => $invoice->id,
+            'title' => 'Hosting',
+            'description' => 'Hosting service',
+            'type' => 'service',
+            'unit' => 'kom',
+            'quantity' => 1,
+            'unit_price' => 100,
+            'amount' => 100,
         ], $attributes));
     }
 }

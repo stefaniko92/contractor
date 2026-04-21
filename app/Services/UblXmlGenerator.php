@@ -100,6 +100,11 @@ class UblXmlGenerator
             $this->addElement($root, 'cbc:AccountingCost', $invoice->trading_place);
         }
 
+        if (! empty($invoice->client->jbkjs)) {
+            $orderReference = $this->createElement($root, 'cac:OrderReference');
+            $this->addElement($orderReference, 'cbc:ID', $invoice->invoice_number);
+        }
+
         // Add Supplier Party (Your Company)
         $this->addSupplierParty($root, $invoice);
 
