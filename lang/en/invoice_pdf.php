@@ -12,6 +12,13 @@ return [
     'to' => 'To',
     'pib' => 'TAX ID',
     'reg_number' => 'Reg. No',
+    'full_name' => 'Full Legal Name',
+    'bank_name' => 'Bank Name',
+    'iban' => 'IBAN',
+    'swift' => 'SWIFT',
+    'address' => 'Address',
+    'city' => 'City',
+    'country' => 'Country',
     'bank_account' => 'Bank Account',
     'email' => 'Email',
 

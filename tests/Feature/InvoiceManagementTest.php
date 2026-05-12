@@ -132,6 +132,62 @@ class InvoiceManagementTest extends TestCase
         $this->assertStringContainsString('<cbc:ID>14/2025</cbc:ID>', $xml);
     }
 
+    public function test_foreign_invoice_preview_shows_swift_and_full_sender_details(): void
+    {
+        $this->user->update([
+            'email' => 'stefan@example.com',
+            'swift_code' => 'BICCODE123',
+            'iban' => 'RS35160600000082564121',
+        ]);
+
+        $this->userCompany->update([
+            'company_name' => 'SR SOFTWARE NIS',
+            'company_full_name' => 'STEFAN RAKIC PR RACUNARSKO PROGRAMIRANJE SR SOFTWARE NIS',
+            'company_tax_id' => '109270190',
+            'company_registry_number' => '64056891',
+            'company_address' => 'Branka Radicevica',
+            'company_address_number' => '26a/92',
+            'company_city' => 'Nis',
+            'company_postal_code' => '18000',
+            'company_email' => 'stefan@example.com',
+            'show_email_on_invoice' => true,
+        ]);
+
+        $client = $this->createClient([
+            'company_name' => 'Janus Trade d.o.o',
+            'address' => 'Koroska Cesta 53c',
+            'city' => 'Kranj',
+            'country' => 'Slovenija',
+            'is_domestic' => false,
+            'currency' => 'EUR',
+            'tax_id' => '576986799',
+        ]);
+
+        $bankAccount = $this->createBankAccount([
+            'account_type' => 'foreign',
+            'currency' => 'EUR',
+            'iban' => 'RS35160600000082564121',
+            'bank_name' => 'Banca Intesa',
+            'swift' => 'DBDBRSBG',
+            'account_number' => null,
+        ]);
+
+        $invoice = $this->createInvoice($client, [
+            'bank_account_id' => $bankAccount->id,
+            'invoice_type' => 'foreign',
+            'currency' => 'EUR',
+        ]);
+
+        $response = $this->get(route('invoices.preview', $invoice));
+
+        $response->assertOk();
+        $response->assertSee('STEFAN RAKIC PR RACUNARSKO PROGRAMIRANJE SR SOFTWARE NIS');
+        $response->assertSee('Banca Intesa');
+        $response->assertSee('RS35160600000082564121');
+        $response->assertSee('DBDBRSBG');
+        $response->assertSee('Slovenija');
+    }
+
     protected function createClient(array $attributes = []): Client
     {
         return Client::create(array_merge([

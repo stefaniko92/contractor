@@ -12,6 +12,13 @@ return [
     'to' => 'Kupac',
     'pib' => 'PIB',
     'reg_number' => 'Matični broj',
+    'full_name' => 'Pun naziv',
+    'bank_name' => 'Naziv banke',
+    'iban' => 'IBAN',
+    'swift' => 'SWIFT',
+    'address' => 'Adresa',
+    'city' => 'Grad',
+    'country' => 'Država',
     'bank_account' => 'Tekući račun',
     'email' => 'Email',
 

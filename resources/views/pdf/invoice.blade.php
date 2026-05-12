@@ -85,6 +85,18 @@
         ? $invoice->issue_date->diffInDays($invoice->due_date)
         : 30;
 
+    $sellerDisplayName = $company?->company_name ?? $user->company_name ?? $user->name;
+    $sellerFullName = $company?->company_full_name;
+    $sellerTaxId = $company?->company_tax_id ?? $user->tax_id;
+    $sellerRegistryNumber = $company?->company_registry_number;
+    $sellerAddress = $company?->company_address ?? $user->address;
+    $sellerAddressNumber = $company?->company_address_number;
+    $sellerCity = $company?->company_city;
+    $sellerPostalCode = $company?->company_postal_code;
+    $sellerEmail = ($company?->show_email_on_invoice && $company?->company_email)
+        ? $company->company_email
+        : $user->email;
+
     // Generate QR code for NBS IPS payment
     $qrCode = null;
 
@@ -98,6 +110,13 @@
             $paymentBankAccount = $company->bankAccounts()->first();
         }
     }
+
+    $sellerBankName = $paymentBankAccount?->bank_name;
+    $sellerIban = $paymentBankAccount?->iban ?: $user->iban;
+    $sellerDomesticAccount = $paymentBankAccount?->account_number;
+    $sellerSwift = $paymentBankAccount?->swift ?: $paymentBankAccount?->swift_code ?: $user->swift_code;
+    $clientCountry = $client->country;
+    $isForeignInvoice = !$isDomestic;
 
     // Generate QR code for domestic invoices with bank account
     if ($paymentBankAccount && $isDomestic) {
@@ -461,34 +480,41 @@
     <div class="parties-section">
         <div class="party-box">
             <div class="party-title">{{ __('invoice_pdf.from') }}:</div>
-            <div class="party-name">{{ $companyName }}</div>
+            <div class="party-name">{{ $sellerDisplayName }}</div>
             <div class="party-details">
-                @if($company?->company_address)
-                    {{ $company->company_address }}@if($company->company_address_number), {{ $company->company_address_number }}@endif<br>
-                @elseif($user->address)
-                    {{ $user->address }}<br>
+                @if($sellerFullName && $sellerFullName !== $sellerDisplayName)
+                    <span class="text-bold">{{ __('invoice_pdf.full_name') }}:</span> {{ $sellerFullName }}<br>
                 @endif
-                @if($company?->company_city)
-                    {{ $company->company_city }} @if($company->company_postal_code){{ $company->company_postal_code }}@endif<br>
+                @if($sellerAddress)
+                    <span class="text-bold">{{ __('invoice_pdf.address') }}:</span>
+                    {{ $sellerAddress }}@if($sellerAddressNumber), {{ $sellerAddressNumber }}@endif<br>
                 @endif
-                @if($company?->company_tax_id)
-                    <span class="text-bold">{{ __('invoice_pdf.pib') }}:</span> {{ $company->company_tax_id }}<br>
-                @elseif($user->tax_id)
-                    <span class="text-bold">{{ __('invoice_pdf.pib') }}:</span> {{ $user->tax_id }}<br>
+                @if($sellerCity || $sellerPostalCode)
+                    <span class="text-bold">{{ __('invoice_pdf.city') }}:</span>
+                    {{ $sellerCity }}@if($sellerPostalCode) {{ $sellerPostalCode }}@endif<br>
                 @endif
-                @if($company?->company_registry_number)
-                    <span class="text-bold">{{ __('invoice_pdf.reg_number') }}:</span> {{ $company->company_registry_number }}<br>
+                @if($sellerTaxId)
+                    <span class="text-bold">{{ __('invoice_pdf.pib') }}:</span> {{ $sellerTaxId }}<br>
                 @endif
-                @if($bankAccount)
+                @if($sellerRegistryNumber)
+                    <span class="text-bold">{{ __('invoice_pdf.reg_number') }}:</span> {{ $sellerRegistryNumber }}<br>
+                @endif
+                @if($isForeignInvoice && $sellerBankName)
+                    <span class="text-bold">{{ __('invoice_pdf.bank_name') }}:</span> {{ $sellerBankName }}<br>
+                @endif
+                @if($isForeignInvoice && $sellerIban)
+                    <span class="text-bold">{{ __('invoice_pdf.iban') }}:</span> {{ $sellerIban }}<br>
+                @elseif($paymentBankAccount)
                     <span class="text-bold">{{ __('invoice_pdf.bank_account') }}:</span>
-                    {{ $bankAccount->account_type === 'foreign' ? ($bankAccount->iban ?? 'N/A') : ($bankAccount->account_number ?? 'N/A') }}<br>
-                @elseif($user->iban)
-                    <span class="text-bold">{{ __('invoice_pdf.bank_account') }}:</span> {{ $user->iban }}<br>
+                    {{ $paymentBankAccount->account_type === 'foreign' ? ($paymentBankAccount->iban ?? 'N/A') : ($paymentBankAccount->account_number ?? 'N/A') }}<br>
+                @elseif($sellerDomesticAccount)
+                    <span class="text-bold">{{ __('invoice_pdf.bank_account') }}:</span> {{ $sellerDomesticAccount }}<br>
                 @endif
-                @if($company?->show_email_on_invoice && $company?->company_email)
-                    <span class="text-bold">{{ __('invoice_pdf.email') }}:</span> {{ $company->company_email }}
-                @elseif($user->email)
-                    <span class="text-bold">{{ __('invoice_pdf.email') }}:</span> {{ $user->email }}
+                @if($isForeignInvoice && $sellerSwift)
+                    <span class="text-bold">{{ __('invoice_pdf.swift') }}:</span> {{ $sellerSwift }}<br>
+                @endif
+                @if($sellerEmail)
+                    <span class="text-bold">{{ __('invoice_pdf.email') }}:</span> {{ $sellerEmail }}
                 @endif
             </div>
         </div>
@@ -498,10 +524,13 @@
             <div class="party-name">{{ $client->company_name }}</div>
             <div class="party-details">
                 @if($client->address)
-                    {{ $client->address }}<br>
+                    <span class="text-bold">{{ __('invoice_pdf.address') }}:</span> {{ $client->address }}<br>
                 @endif
                 @if($client->city)
-                    {{ $client->city }}@if($client->country), {{ $client->country }}@endif<br>
+                    <span class="text-bold">{{ __('invoice_pdf.city') }}:</span> {{ $client->city }}<br>
+                @endif
+                @if($clientCountry)
+                    <span class="text-bold">{{ __('invoice_pdf.country') }}:</span> {{ $clientCountry }}<br>
                 @endif
                 @if($client->tax_id)
                     <span class="text-bold">{{ __('invoice_pdf.pib') }}:</span> {{ $client->tax_id }}<br>
