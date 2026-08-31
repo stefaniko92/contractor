@@ -6,13 +6,15 @@ use Filament\Actions\Action;
 use Filament\Auth\Pages\Register as BaseRegister;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
-use Laravel\Cashier\Subscription;
+use Illuminate\Support\HtmlString;
 
 class Register extends BaseRegister
 {
@@ -25,13 +27,13 @@ class Register extends BaseRegister
         return 'Registracija';
     }
 
-    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    public function getSubheading(): string|Htmlable|null
     {
         if (! filament()->hasLogin()) {
             return null;
         }
 
-        return new \Illuminate\Support\HtmlString('ili '.$this->loginAction->toHtml());
+        return new HtmlString('ili '.$this->loginAction->toHtml());
     }
 
     public function form(Schema $schema): Schema
@@ -74,7 +76,7 @@ class Register extends BaseRegister
                     Step::make('Izaberite plan')
                         ->description('Kliknite na plan koji želite')
                         ->schema([
-                            \Filament\Forms\Components\ViewField::make('plan_cards')
+                            ViewField::make('plan_cards')
                                 ->view('filament.pages.auth.plan-selection')
                                 ->dehydrated(false)
                                 ->columnSpanFull(),
@@ -82,7 +84,7 @@ class Register extends BaseRegister
                 ])
                     ->nextAction(fn ($action) => $action->label(__('actions.next')))
                     ->previousAction(fn ($action) => $action->label(__('actions.back')))
-                    ->submitAction(new \Illuminate\Support\HtmlString(view('filament.pages.auth.wizard-submit-button')->render()))
+                    ->submitAction(new HtmlString(view('filament.pages.auth.wizard-submit-button')->render()))
                     ->columnSpanFull(),
             ]);
     }
@@ -141,20 +143,7 @@ class Register extends BaseRegister
     {
         $user = parent::handleRegistration($data);
 
-        if ($this->selectedPlan === 'free' || ! $this->selectedPlan) {
-            // Create a free "subscription" record for tracking
-            // This won't use Stripe, just a local database record
-            Subscription::create([
-                'user_id' => $user->id,
-                'name' => 'default',
-                'stripe_id' => 'free_plan_'.time(),
-                'stripe_status' => 'active',
-                'stripe_price' => null,
-                'quantity' => 1,
-                'trial_ends_at' => null,
-                'ends_at' => null,
-            ]);
-        } else {
+        if ($this->selectedPlan !== 'free' && $this->selectedPlan) {
             // Paid plan selected - store in session and redirect to Stripe
             session()->put('selected_plan_after_registration', $this->selectedPlan);
             redirect()->setIntendedUrl(route('filament.admin.pages.subscription-management'));

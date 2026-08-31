@@ -3,6 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Database\Factories\UserFactory;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -12,7 +14,7 @@ use Laravel\Cashier\Billable;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use Billable, HasFactory, Notifiable;
 
     /**
@@ -66,7 +68,7 @@ class User extends Authenticatable
     /**
      * Determine if the user can access the Filament admin panel
      */
-    public function canAccessPanel(\Filament\Panel $panel): bool
+    public function canAccessPanel(Panel $panel): bool
     {
         // Allow all registered users to access the admin panel
         // This is a multi-tenant app where each user manages their own data
@@ -86,7 +88,7 @@ class User extends Authenticatable
      */
     public function hasActiveSubscriptionOrGrandfathered(): bool
     {
-        return $this->is_grandfathered || $this->subscribed('default');
+        return $this->is_grandfathered || $this->hasPaidSubscription();
     }
 
     /**
@@ -94,7 +96,16 @@ class User extends Authenticatable
      */
     public function isOnFreePlan(): bool
     {
-        return ! $this->is_grandfathered && ! $this->subscribed('default');
+        return ! $this->is_grandfathered && ! $this->hasPaidSubscription();
+    }
+
+    public function hasPaidSubscription(): bool
+    {
+        $subscription = $this->subscription('default');
+
+        return $subscription !== null
+            && ! str_starts_with((string) $subscription->stripe_id, 'free_plan_')
+            && $subscription->active();
     }
 
     /**
@@ -106,11 +117,11 @@ class User extends Authenticatable
             return PHP_INT_MAX; // Unlimited for grandfathered users
         }
 
-        if ($this->subscribed('default')) {
+        if ($this->hasPaidSubscription()) {
             return PHP_INT_MAX; // Unlimited for paid subscribers
         }
 
-        return 3; // Free plan limit
+        return (int) config('subscriptions.free_limits.monthly_invoices');
     }
 
     /**

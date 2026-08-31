@@ -39,7 +39,7 @@ class SubscriptionManagement extends Page
             return 'Grandfather';
         }
 
-        if ($user->subscribed('default')) {
+        if ($user->hasPaidSubscription()) {
             $subscription = $user->subscription('default');
 
             if ($subscription->onTrial()) {
@@ -60,7 +60,7 @@ class SubscriptionManagement extends Page
             return 'success';
         }
 
-        if ($user->subscribed('default')) {
+        if ($user->hasPaidSubscription()) {
             $subscription = $user->subscription('default');
 
             if ($subscription->onTrial()) {
@@ -138,19 +138,8 @@ class SubscriptionManagement extends Page
             ];
         }
 
-        if ($user->subscribed('default')) {
+        if ($user->hasPaidSubscription()) {
             $subscription = $user->subscription('default');
-
-            // Check if this is a fake free plan subscription (not a real Stripe subscription)
-            if (str_starts_with($subscription->stripe_id, 'free_plan_')) {
-                return [
-                    'status' => 'free',
-                    'plan_name' => 'Free',
-                    'description' => $plans['free']['description'],
-                    'monthly_invoices' => 3,
-                    'current_invoices' => $user->getMonthlyInvoiceCount(),
-                ];
-            }
 
             return [
                 'status' => 'active',
@@ -169,7 +158,7 @@ class SubscriptionManagement extends Page
             'status' => 'free',
             'plan_name' => 'Free',
             'description' => $plans['free']['description'],
-            'monthly_invoices' => 3,
+            'monthly_invoices' => $plans['free']['limits']['monthly_invoices'],
             'current_invoices' => $user->getMonthlyInvoiceCount(),
         ];
     }
@@ -180,7 +169,8 @@ class SubscriptionManagement extends Page
     public function subscribeMonthly(): void
     {
         $user = Auth::user();
-        $priceId = config('subscriptions.plans.basic_monthly.stripe_price_id');
+        $plan = config('subscriptions.plans.basic_monthly');
+        $priceId = $plan['stripe_price_id'];
 
         if (empty($priceId)) {
             Notification::make()
@@ -195,7 +185,7 @@ class SubscriptionManagement extends Page
         try {
             $checkout = $user
                 ->newSubscription('default', $priceId)
-                // ->trialDays(7) // Temporarily disabled for testing
+                ->trialDays($plan['trial_days'])
                 ->checkout([
                     'success_url' => route('filament.admin.pages.subscription-management').'?success=true',
                     'cancel_url' => route('filament.admin.pages.subscription-management').'?canceled=true',
@@ -217,7 +207,8 @@ class SubscriptionManagement extends Page
     public function subscribeYearly(): void
     {
         $user = Auth::user();
-        $priceId = config('subscriptions.plans.basic_yearly.stripe_price_id');
+        $plan = config('subscriptions.plans.basic_yearly');
+        $priceId = $plan['stripe_price_id'];
 
         if (empty($priceId)) {
             Notification::make()
@@ -232,7 +223,7 @@ class SubscriptionManagement extends Page
         try {
             $checkout = $user
                 ->newSubscription('default', $priceId)
-                // ->trialDays(7) // Temporarily disabled for testing
+                ->trialDays($plan['trial_days'])
                 ->checkout([
                     'success_url' => route('filament.admin.pages.subscription-management').'?success=true',
                     'cancel_url' => route('filament.admin.pages.subscription-management').'?canceled=true',
@@ -276,7 +267,7 @@ class SubscriptionManagement extends Page
             return [];
         }
 
-        if ($user->subscribed('default')) {
+        if ($user->hasPaidSubscription()) {
             return [
                 Action::make('manage_billing')
                     ->label('Upravljaj naplatom')

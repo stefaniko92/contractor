@@ -4,6 +4,7 @@ use App\Http\Middleware\PublicInvoiceRateLimit;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\HandleCors;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -19,6 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->validateCsrfTokens(except: [
+            'stripe/*',
+        ]);
+
         // Register custom middleware aliases
         $middleware->alias([
             'public_invoice_rate_limit' => PublicInvoiceRateLimit::class,
@@ -26,7 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Configure API middleware
         $middleware->api(prepend: [
-            \Illuminate\Http\Middleware\HandleCors::class,
+            HandleCors::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

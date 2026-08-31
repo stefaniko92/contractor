@@ -81,7 +81,7 @@ class UserForm
                                     $subscription = $record->subscription('default');
                                     $status = $subscription->onTrial() ? 'Na probnom periodu' : 'Aktivna';
 
-                                    return "✓ {$status} - {$subscription->name}";
+                                    return "✓ {$status} - {$subscription->type}";
                                 }
 
                                 return 'Free Plan (3 fakture/mesec)';

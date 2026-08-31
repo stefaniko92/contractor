@@ -23,7 +23,7 @@ class PublicInvoiceRateLimit
 
         $cacheKey = 'public_invoice_count:'.md5(strtolower($email));
         $ttl = 30 * 24 * 60 * 60; // 30 days in seconds
-        $maxInvoices = 3;
+        $maxInvoices = (int) config('subscriptions.free_limits.monthly_invoices');
 
         // Get current count
         $count = Cache::get($cacheKey, 0);
@@ -31,7 +31,7 @@ class PublicInvoiceRateLimit
         if ($count >= $maxInvoices) {
             return response()->json([
                 'success' => false,
-                'error' => 'Dostigli ste maksimalan broj besplatnih faktura (3) u zadnjih 30 dana.',
+                'error' => "Dostigli ste maksimalan broj besplatnih faktura ({$maxInvoices}) u zadnjih 30 dana.",
                 'message' => 'Registrujte se za neograničeno kreiranje faktura.',
             ], 429);
         }
