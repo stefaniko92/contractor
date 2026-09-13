@@ -122,6 +122,36 @@ class InvoiceManagementTest extends TestCase
         ]);
     }
 
+    public function test_create_invoice_page_saves_drafts_only_when_the_draft_action_is_selected(): void
+    {
+        $client = $this->createClient();
+        $bankAccount = $this->createBankAccount();
+
+        Livewire::test(CreateInvoicePage::class)
+            ->fillForm([
+                'client_id' => $client->id,
+                'bank_account_id' => $bankAccount->id,
+                'invoice_number' => 'DRAFT-001/2026',
+                'description' => 'Saved as a deliberate draft',
+                'invoice_items' => [[
+                    'type' => 'service',
+                    'description' => 'Consulting',
+                    'unit' => 'sat',
+                    'quantity' => 1,
+                    'unit_price' => 100,
+                    'discount_value' => 0,
+                    'discount_type' => 'percent',
+                    'total' => 100,
+                ]],
+            ])
+            ->call('saveAsDraft');
+
+        $this->assertDatabaseHas('invoices', [
+            'invoice_number' => 'DRAFT-001/2026',
+            'status' => 'in_preparation',
+        ]);
+    }
+
     public function test_bulk_action_marks_selected_invoices_as_sent(): void
     {
         $client = $this->createClient();

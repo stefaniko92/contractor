@@ -841,26 +841,21 @@ class CreateInvoicePage extends Page implements HasForms
                 ->label(__('create_invoice.actions.save_draft'))
                 ->icon('heroicon-o-document')
                 ->color('gray')
-                ->requiresConfirmation()
-                ->modalIcon('heroicon-o-exclamation-triangle')
-                ->modalHeading(__('create_invoice.actions.save_draft_confirmation.heading'))
-                ->modalDescription(__('create_invoice.actions.save_draft_confirmation.description'))
-                ->modalSubmitActionLabel(__('create_invoice.actions.save_draft_confirmation.submit'))
-                ->action('saveAsDraft')
+                ->submit('saveAsDraft')
                 ->extraAttributes(['class' => 'mt-6']),
 
             Action::make('send')
                 ->label(__('create_invoice.actions.issue_and_send'))
                 ->icon('heroicon-o-paper-airplane')
                 ->color('gray')
-                ->action('issueAndSend')
+                ->submit('issueAndSend')
                 ->extraAttributes(['class' => 'mt-6']),
 
             Action::make('issue')
                 ->label(__('create_invoice.actions.issue'))
                 ->icon('heroicon-o-check-circle')
                 ->color('primary')
-                ->action('issueInvoice')
+                ->submit('issueInvoice')
                 ->extraAttributes(['class' => 'mt-6']),
         ];
     }
