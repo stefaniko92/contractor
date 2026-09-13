@@ -9,6 +9,7 @@
             $currentYear = now()->year;
 
             $annualIncome = \App\Models\Invoice::where('invoices.user_id', $userId)
+                ->countsTowardsPausalIncome()
                 ->join('clients', 'invoices.client_id', '=', 'clients.id')
                 ->where('clients.is_domestic', true)
                 ->whereYear('invoices.issue_date', $currentYear)

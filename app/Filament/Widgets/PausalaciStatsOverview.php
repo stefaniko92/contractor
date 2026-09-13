@@ -2,7 +2,6 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\Income;
 use App\Models\Invoice;
 use App\Models\Obligation;
 use Filament\Widgets\StatsOverviewWidget;
@@ -18,8 +17,8 @@ class PausalaciStatsOverview extends StatsOverviewWidget
         $userId = Auth::id();
         $currentYear = now()->year;
 
-        // Calculate annual income from domestic invoices only
         $annualIncome = Invoice::where('invoices.user_id', $userId)
+            ->countsTowardsPausalIncome()
             ->join('clients', 'invoices.client_id', '=', 'clients.id')
             ->where('clients.is_domestic', true)
             ->whereYear('invoices.issue_date', $currentYear)

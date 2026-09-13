@@ -126,6 +126,36 @@ class InvoiceManagementTest extends TestCase
         ]);
     }
 
+    public function test_pausal_income_excludes_drafts_and_storno_invoices(): void
+    {
+        $client = $this->createClient();
+
+        $issuedInvoice = $this->createInvoice($client, [
+            'invoice_number' => '1/2026',
+            'amount' => 100,
+            'status' => 'issued',
+        ]);
+        $issuedInvoice->updateQuietly(['amount' => 100]);
+        $this->createInvoice($client, [
+            'invoice_number' => '2/2026',
+            'amount' => 200,
+            'status' => 'in_preparation',
+        ]);
+        $this->createInvoice($client, [
+            'invoice_number' => '3/2026',
+            'amount' => -100,
+            'status' => 'storned',
+            'is_storno' => true,
+        ]);
+
+        $income = Invoice::query()
+            ->where('user_id', $this->user->id)
+            ->countsTowardsPausalIncome()
+            ->sum('amount');
+
+        $this->assertSame(100.0, (float) $income);
+    }
+
     public function test_budget_user_invoice_ubl_includes_order_reference(): void
     {
         $client = $this->createClient([

@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Services\UblXmlGenerator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Invoice extends Model
 {
@@ -62,6 +65,18 @@ class Invoice extends Model
         return $this->hasMany(InvoiceItem::class);
     }
 
+    public function scopeCountsTowardsPausalIncome(Builder $query): Builder
+    {
+        return $query->whereIn('status', [
+            'issued',
+            'sent',
+            'charged',
+            'uncharged',
+            'paid',
+            'unpaid',
+        ]);
+    }
+
     /**
      * Get the original invoice if this is a storno invoice
      */
@@ -81,7 +96,7 @@ class Invoice extends Model
     /**
      * Get the eFaktura invoice record for this invoice
      */
-    public function efakturaInvoice(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function efakturaInvoice(): HasOne
     {
         return $this->hasOne(EfakturaInvoice::class);
     }
@@ -91,7 +106,7 @@ class Invoice extends Model
      */
     public function generateUblXml(): string
     {
-        $generator = new \App\Services\UblXmlGenerator;
+        $generator = new UblXmlGenerator;
 
         return $generator->generate($this);
     }

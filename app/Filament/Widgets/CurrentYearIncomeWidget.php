@@ -23,8 +23,8 @@ class CurrentYearIncomeWidget extends StatsOverviewWidget
         $userId = Auth::id();
         $currentYear = now()->year;
 
-        // Calculate annual income from domestic invoices only
         $annualIncome = Invoice::where('invoices.user_id', $userId)
+            ->countsTowardsPausalIncome()
             ->join('clients', 'invoices.client_id', '=', 'clients.id')
             ->where('clients.is_domestic', true)
             ->whereYear('invoices.issue_date', $currentYear)

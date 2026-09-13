@@ -22,10 +22,10 @@ class TwelveMonthIncomeWidget extends StatsOverviewWidget
     {
         $userId = Auth::id();
 
-        // Calculate income from domestic invoices in the last 12 months
         $twelveMonthsAgo = now()->subMonths(12);
 
         $twelveMonthIncome = Invoice::where('invoices.user_id', $userId)
+            ->countsTowardsPausalIncome()
             ->join('clients', 'invoices.client_id', '=', 'clients.id')
             ->where('clients.is_domestic', true)
             ->where('invoices.issue_date', '>=', $twelveMonthsAgo)

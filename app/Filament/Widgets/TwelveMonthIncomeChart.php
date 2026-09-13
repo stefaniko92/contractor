@@ -19,8 +19,8 @@ class TwelveMonthIncomeChart extends ChartWidget
         $userId = Auth::id();
         $twelveMonthsAgo = now()->subMonths(12);
 
-        // Calculate income from domestic invoices in the last 12 months
         $twelveMonthIncome = Invoice::where('invoices.user_id', $userId)
+            ->countsTowardsPausalIncome()
             ->join('clients', 'invoices.client_id', '=', 'clients.id')
             ->where('clients.is_domestic', true)
             ->where('invoices.issue_date', '>=', $twelveMonthsAgo)
