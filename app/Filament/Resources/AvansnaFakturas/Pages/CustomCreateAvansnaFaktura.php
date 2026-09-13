@@ -7,6 +7,7 @@ use App\Models\BankAccount;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Support\InvoiceParticipantInformation;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
@@ -22,6 +23,7 @@ use Filament\Resources\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\HtmlString;
 
 class CustomCreateAvansnaFaktura extends Page implements HasForms
 {
@@ -273,30 +275,12 @@ class CustomCreateAvansnaFaktura extends Page implements HasForms
                                 Placeholder::make('company_info')
                                     ->label('Izdavalac (Vaša kompanija)')
                                     ->content(function ($get) {
-                                        $user = Auth::user();
+                                        $bankAccount = BankAccount::query()
+                                            ->whereKey($get('bank_account_id'))
+                                            ->whereHas('userCompany', fn ($query) => $query->where('user_id', Auth::id()))
+                                            ->first();
 
-                                        $info = [];
-                                        $info[] = $user->company_name ?? 'SR Software Niš';
-                                        $info[] = 'STEFAN RAKIĆ PR RAČUNARSKO PROGRAMIRANJE SR SOFTWARE NIŠ';
-                                        $info[] = $user->address ?? 'Vojvode Tankosica 11/63';
-                                        $info[] = 'Niš 18000';
-                                        $info[] = 'E-mail: '.($user->email ?? 'stefanrakic92@gmail.com');
-                                        $info[] = 'PIB: 109270190';
-                                        $info[] = 'MB: 64056891';
-
-                                        // Show SWIFT and IBAN for foreign invoices
-                                        if (($get('invoice_type') ?? 'domestic') === 'foreign') {
-                                            if ($user->swift_code) {
-                                                $info[] = 'SWIFT: '.$user->swift_code;
-                                            }
-                                            if ($user->iban) {
-                                                $info[] = 'IBAN: '.$user->iban;
-                                            }
-                                        }
-
-                                        return new \Illuminate\Support\HtmlString('<div class="space-y-1">'.
-                                            implode('<br>', array_map(fn ($line) => '<div>'.e($line).'</div>', $info)).
-                                        '</div>');
+                                        return InvoiceParticipantInformation::forUser(Auth::user(), $bankAccount);
                                     })
                                     ->columnSpan(1),
 
@@ -346,7 +330,7 @@ class CustomCreateAvansnaFaktura extends Page implements HasForms
                                             $info[] = 'VAT/EIB: '.$client->vat_number;
                                         }
 
-                                        return new \Illuminate\Support\HtmlString('<div class="space-y-1">'.
+                                        return new HtmlString('<div class="space-y-1">'.
                                             implode('<br>', array_map(fn ($line) => '<div>'.e($line).'</div>', $info)).
                                         '</div>');
                                     })
@@ -475,7 +459,7 @@ class CustomCreateAvansnaFaktura extends Page implements HasForms
 
                                         $currency = $get('currency') ?? 'RSD';
 
-                                        return new \Illuminate\Support\HtmlString('<div class="text-2xl font-bold text-blue-600">'.number_format($total, 2).' '.$currency.'</div>');
+                                        return new HtmlString('<div class="text-2xl font-bold text-blue-600">'.number_format($total, 2).' '.$currency.'</div>');
                                     })
                                     ->columnSpanFull(),
                             ]),

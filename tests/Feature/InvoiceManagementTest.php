@@ -52,6 +52,18 @@ class InvoiceManagementTest extends TestCase
             ]);
     }
 
+    public function test_create_invoice_page_does_not_display_fallback_company_data(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user);
+
+        Livewire::test(CreateInvoicePage::class)
+            ->assertSee('Unesite podatke o kompaniji pre kreiranja fakture.')
+            ->assertDontSee('STEFAN RAKIĆ PR RAČUNARSKO PROGRAMIRANJE SR SOFTWARE NIŠ')
+            ->assertDontSee('109270190');
+    }
+
     public function test_edit_invoice_page_preselects_primary_bank_account_when_missing(): void
     {
         $bankAccount = $this->createBankAccount();
