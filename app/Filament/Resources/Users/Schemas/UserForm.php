@@ -126,6 +126,16 @@ class UserForm
                     ])
                     ->columns(2)
                     ->collapsible(),
+
+                Section::make('Administracija')
+                    ->schema([
+                        Toggle::make('is_admin')
+                            ->label('Administrator')
+                            ->helperText('Administrator ima pristup korisnicima, pretplatama i operativnom pregledu.')
+                            ->disabled(fn ($record): bool => $record?->is(auth()->user()) ?? false)
+                            ->inline(false),
+                    ])
+                    ->collapsible(),
             ]);
     }
 }
