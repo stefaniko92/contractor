@@ -123,8 +123,14 @@ return [
 
     'actions' => [
         'save' => 'Save',
+        'save_draft' => 'Save as Draft',
         'issue' => 'Issue Invoice',
         'issue_and_send' => 'Issue and Send',
+        'save_draft_confirmation' => [
+            'heading' => 'Save as draft?',
+            'description' => 'A draft has not been issued and is excluded from the displayed turnover limit until it is issued.',
+            'submit' => 'Save as Draft',
+        ],
     ],
 
     'notifications' => [

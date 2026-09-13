@@ -92,6 +92,36 @@ class InvoiceManagementTest extends TestCase
         ]);
     }
 
+    public function test_create_invoice_page_issues_invoice_when_using_the_default_create_action(): void
+    {
+        $client = $this->createClient();
+        $bankAccount = $this->createBankAccount();
+
+        Livewire::test(CreateInvoicePage::class)
+            ->fillForm([
+                'client_id' => $client->id,
+                'bank_account_id' => $bankAccount->id,
+                'invoice_number' => 'ISSUED-001/2026',
+                'description' => 'Issued through the default action',
+                'invoice_items' => [[
+                    'type' => 'service',
+                    'description' => 'Consulting',
+                    'unit' => 'sat',
+                    'quantity' => 1,
+                    'unit_price' => 100,
+                    'discount_value' => 0,
+                    'discount_type' => 'percent',
+                    'total' => 100,
+                ]],
+            ])
+            ->call('create');
+
+        $this->assertDatabaseHas('invoices', [
+            'invoice_number' => 'ISSUED-001/2026',
+            'status' => 'issued',
+        ]);
+    }
+
     public function test_bulk_action_marks_selected_invoices_as_sent(): void
     {
         $client = $this->createClient();

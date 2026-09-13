@@ -831,32 +831,36 @@ class CreateInvoicePage extends Page implements HasForms
     // Keep the old create method for backward compatibility
     public function create(): void
     {
-        $this->createInvoice('in_preparation');
+        $this->createInvoice('issued');
     }
 
     protected function getFormActions(): array
     {
         return [
             Action::make('save')
-                ->label(__('create_invoice.actions.save'))
+                ->label(__('create_invoice.actions.save_draft'))
                 ->icon('heroicon-o-document')
                 ->color('gray')
+                ->requiresConfirmation()
+                ->modalIcon('heroicon-o-exclamation-triangle')
+                ->modalHeading(__('create_invoice.actions.save_draft_confirmation.heading'))
+                ->modalDescription(__('create_invoice.actions.save_draft_confirmation.description'))
+                ->modalSubmitActionLabel(__('create_invoice.actions.save_draft_confirmation.submit'))
                 ->action('saveAsDraft')
-                ->extraAttributes(['class' => 'mt-6']),
-
-            Action::make('issue')
-                ->label(__('create_invoice.actions.issue'))
-                ->icon('heroicon-o-check-circle')
-                ->color('success')
-                ->action('issueInvoice')
                 ->extraAttributes(['class' => 'mt-6']),
 
             Action::make('send')
                 ->label(__('create_invoice.actions.issue_and_send'))
                 ->icon('heroicon-o-paper-airplane')
-                ->color('primary')
+                ->color('gray')
                 ->action('issueAndSend')
-                ->keyBindings(['mod+s'])
+                ->extraAttributes(['class' => 'mt-6']),
+
+            Action::make('issue')
+                ->label(__('create_invoice.actions.issue'))
+                ->icon('heroicon-o-check-circle')
+                ->color('primary')
+                ->action('issueInvoice')
                 ->extraAttributes(['class' => 'mt-6']),
         ];
     }

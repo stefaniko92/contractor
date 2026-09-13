@@ -123,8 +123,14 @@ return [
 
     'actions' => [
         'save' => 'Sačuvaj',
+        'save_draft' => 'Sačuvaj kao nacrt',
         'issue' => 'Izdaj fakturu',
         'issue_and_send' => 'Izdaj i pošalji',
+        'save_draft_confirmation' => [
+            'heading' => 'Sačuvati kao nacrt?',
+            'description' => 'Nacrt nije izdat i ne ulazi u prikazani promet prema limitu dok ga ne izdate.',
+            'submit' => 'Sačuvaj kao nacrt',
+        ],
     ],
 
     'notifications' => [
