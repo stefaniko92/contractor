@@ -13,6 +13,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class SefService
 {
@@ -47,7 +48,7 @@ class SefService
 
     public function __construct(?int $userId = null)
     {
-        $this->baseUrl = config('services.sef.base_url', 'https://suf.purs.gov.rs/api');
+        $this->baseUrl = config('services.sef.base_url', 'https://efaktura.mfin.gov.rs/api');
         $this->timeout = config('services.sef.timeout', 30);
         $this->connectTimeout = config('services.sef.connect_timeout', 10);
         $this->verifySsl = config('services.sef.verify_ssl', true);
@@ -152,15 +153,15 @@ class SefService
         $url = $this->baseUrl.'/'.ltrim($endpoint, '/');
 
         // Generate request ID for tracking
-        $requestId = $this->generateRequestId();
+        $requestId = $options['headers']['X-Request-Id'] ?? $this->generateRequestId();
 
         // Build headers
-        $headers = array_merge($options['headers'] ?? [], [
+        $headers = array_merge([
             'ApiKey' => $this->apiKey,
             'X-Request-Id' => $requestId,
             'Accept' => 'application/json',
             'User-Agent' => 'Pausalci-SEF-Integration/1.0',
-        ]);
+        ], $options['headers'] ?? []);
 
         Log::info('SEF API Request', [
             'method' => $method,
@@ -1018,6 +1019,7 @@ class SefService
         $options = [
             'headers' => [
                 'Content-Type' => 'application/xml; charset=utf-8',
+                'X-Request-Id' => $params['requestId'] ?? $this->generateRequestId(),
             ],
             'body' => $xmlContent,
         ];
@@ -1073,9 +1075,7 @@ class SefService
             $params['sendToCir'] = $sendToCir;
         }
 
-        if ($requestId !== null) {
-            $params['requestId'] = $requestId;
-        }
+        $params['requestId'] = $requestId ?: (string) Str::uuid();
 
         // executeValidation can be added if needed
         $params['executeValidation'] = true;

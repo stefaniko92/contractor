@@ -4,7 +4,12 @@ namespace App\Filament\Resources\Invoices\Pages;
 
 use App\Filament\Resources\Invoices\InvoiceResource;
 use App\Helpers\FilamentHelper;
+use App\Models\EfakturaInvoice;
+use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Services\Sef\InvoiceValidator;
+use App\Services\Sef\RecipientResolver;
+use App\Services\Sef\VatProfileResolver;
 use App\Services\SefService;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
@@ -162,7 +167,7 @@ class EditInvoice extends EditRecord
                 ->modalIcon('heroicon-o-exclamation-triangle')
                 ->visible(fn () => ! $this->record->is_storno && $this->record->status !== 'in_preparation' && $this->record->stornoInvoices()->count() === 0)
                 ->action(function () {
-                    $stornoInvoice = \App\Models\Invoice::create([
+                    $stornoInvoice = Invoice::create([
                         'user_id' => $this->record->user_id,
                         'client_id' => $this->record->client_id,
                         'invoice_type' => $this->record->invoice_type,
@@ -297,6 +302,21 @@ class EditInvoice extends EditRecord
                         return;
                     }
 
+                    $validation = (new InvoiceValidator(
+                        new VatProfileResolver($sefService),
+                        new RecipientResolver($sefService),
+                    ))->validate($this->record);
+
+                    if ($validation->hasErrors()) {
+                        Notification::make()
+                            ->title('Faktura nije spremna za SEF')
+                            ->body(implode(' ', $validation->errors))
+                            ->danger()
+                            ->send();
+
+                        return;
+                    }
+
                     try {
                         Log::info('eFaktura send action triggered', [
                             'invoice_id' => $this->record->id,
@@ -320,14 +340,17 @@ class EditInvoice extends EditRecord
                             'xml_content' => $xmlContent,
                         ]);
 
+                        $efakturaInvoice = EfakturaInvoice::forSubmission($this->record);
+
                         $response = $sefService->sendInvoice(
                             $xmlContent,
                             ! empty($this->record->client->jbkjs) ? 'Yes' : 'No',
+                            $efakturaInvoice->sef_request_id,
                         );
 
                         if (isset($response['error'])) {
                             // Update existing record or create new one
-                            \App\Models\EfakturaInvoice::updateOrCreate(
+                            EfakturaInvoice::updateOrCreate(
                                 ['invoice_id' => $this->record->id],
                                 [
                                     'user_id' => $this->record->user_id,
@@ -354,13 +377,13 @@ class EditInvoice extends EditRecord
                         }
 
                         // Update existing record or create new one
-                        $efakturaInvoice = \App\Models\EfakturaInvoice::updateOrCreate(
+                        $efakturaInvoice = EfakturaInvoice::updateOrCreate(
                             ['invoice_id' => $this->record->id],
                             [
                                 'user_id' => $this->record->user_id,
                                 'sef_invoice_id' => $response['SalesInvoiceId'] ?? $response['salesInvoiceId'] ?? $response['InvoiceId'] ?? $response['invoiceId'] ?? $response['id'] ?? null,
                                 'sef_invoice_number' => $response['InvoiceNumber'] ?? $response['invoiceNumber'] ?? null,
-                                'sef_request_id' => $response['RequestId'] ?? $response['requestId'] ?? null,
+                                'sef_request_id' => $response['RequestId'] ?? $response['requestId'] ?? $efakturaInvoice->sef_request_id,
                                 'status' => 'sent',
                                 'sent_at' => now(),
                                 'last_error' => null,

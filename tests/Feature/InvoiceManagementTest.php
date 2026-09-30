@@ -9,10 +9,16 @@ use App\Models\BankAccount;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\SefEfakturaSetting;
 use App\Models\User;
 use App\Models\UserCompany;
+use App\Services\Sef\InvoiceValidator;
+use App\Services\Sef\RecipientResolver;
+use App\Services\Sef\VatProfileResolver;
+use App\Services\SefService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -225,13 +231,66 @@ class InvoiceManagementTest extends TestCase
         ]);
         $invoice = $this->createInvoice($client, [
             'invoice_number' => '14/2025',
+            'delivery_date' => now(),
+            'order_reference' => 'NAR-14/2025',
+            'contract_reference' => 'UG-2025-14',
+            'lot_reference' => 'LOT-3',
         ]);
         $this->createInvoiceItem($invoice);
 
         $xml = $invoice->generateUblXml();
 
         $this->assertStringContainsString('<cac:OrderReference>', $xml);
-        $this->assertStringContainsString('<cbc:ID>14/2025</cbc:ID>', $xml);
+        $this->assertStringContainsString('<cbc:ID>NAR-14/2025</cbc:ID>', $xml);
+        $this->assertStringContainsString('<cac:ContractDocumentReference>', $xml);
+        $this->assertStringContainsString('<cbc:ID>UG-2025-14</cbc:ID>', $xml);
+        $this->assertStringContainsString('<cac:AdditionalDocumentReference>', $xml);
+        $this->assertStringContainsString('<cbc:ID>LOT-3</cbc:ID>', $xml);
+    }
+
+    public function test_budget_user_invoice_requires_a_real_procurement_reference_before_sending_to_sef(): void
+    {
+        $this->userCompany->update([
+            'company_tax_id' => '109270190',
+            'company_address' => 'Bulevar oslobođenja 1',
+        ]);
+
+        SefEfakturaSetting::factory()->create([
+            'user_id' => $this->user->id,
+            'is_enabled' => true,
+            'api_key' => 'test-api-key',
+            'default_vat_exemption' => 'PDV-RS-33',
+            'default_vat_category' => 'SS',
+        ]);
+
+        Http::fake([
+            '*' => Http::response([[
+                'key' => 'PDV-RS-33',
+                'text' => 'Mali poreski obveznik.',
+            ]]),
+        ]);
+
+        $client = $this->createClient([
+            'jbkjs' => '80596',
+            'efaktura_verified' => true,
+            'efaktura_status' => 'active',
+        ]);
+        $invoice = $this->createInvoice($client, [
+            'delivery_date' => now(),
+        ]);
+        $this->createInvoiceItem($invoice);
+
+        $sefService = SefService::forUser($this->user->id);
+        $validation = (new InvoiceValidator(
+            new VatProfileResolver($sefService),
+            new RecipientResolver($sefService),
+        ))->validate($invoice);
+
+        $this->assertTrue($validation->hasErrors());
+        $this->assertContains(
+            'Za budžetskog korisnika unesite broj narudžbenice, ugovora ili partije.',
+            $validation->errors,
+        );
     }
 
     public function test_foreign_invoice_preview_shows_swift_and_full_sender_details(): void

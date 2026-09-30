@@ -169,6 +169,14 @@ class SefServiceTest extends TestCase
         $this->assertTrue($response['response_omitted']);
         $this->assertSame(strlen($responseBody), $response['response_size']);
         $this->assertArrayNotHasKey('padding', $response);
+
+        Http::assertSent(function ($request): bool {
+            parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+            return isset($query['requestId'])
+                && $query['requestId'] !== ''
+                && $request->header('X-Request-Id')[0] === $query['requestId'];
+        });
     }
 
     #[Test]

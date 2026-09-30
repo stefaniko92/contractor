@@ -15,6 +15,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\HtmlString;
 
 class InvoiceForm
 {
@@ -118,6 +119,12 @@ class InvoiceForm
 
                                 DatePicker::make('issue_date')
                                     ->label('Datum izdavanja')
+                                    ->required()
+                                    ->default(now()),
+
+                                DatePicker::make('delivery_date')
+                                    ->label('Datum prometa')
+                                    ->helperText('Obavezan datum za slanje fakture kroz SEF.')
                                     ->required()
                                     ->default(now()),
 
@@ -237,6 +244,41 @@ class InvoiceForm
                             ])
                             ->columns(2),
 
+                        Section::make('SEF podaci za budžetskog korisnika')
+                            ->description('SEF zahteva najmanje jedan stvarni broj: narudžbenice, ugovora ili partije.')
+                            ->visible(function ($get): bool {
+                                $clientId = $get('client_id');
+
+                                return filled($clientId) && filled(Client::find($clientId)?->jbkjs);
+                            })
+                            ->schema([
+                                TextInput::make('order_reference')
+                                    ->label('Broj narudžbenice'),
+                                TextInput::make('contract_reference')
+                                    ->label('Broj ugovora'),
+                                TextInput::make('lot_reference')
+                                    ->label('Broj partije'),
+                            ])
+                            ->columns(3),
+
+                        Section::make('SEF period obračuna PDV-a')
+                            ->description('Popunjava se samo kada je u SEF podešavanjima izabrana kategorija S10 ili S20.')
+                            ->collapsed()
+                            ->schema([
+                                DatePicker::make('invoice_period_start_date')
+                                    ->label('Početak perioda'),
+                                DatePicker::make('invoice_period_end_date')
+                                    ->label('Kraj perioda'),
+                                Select::make('invoice_period_description_code')
+                                    ->label('Šifra perioda')
+                                    ->options([
+                                        '3' => '3 - kalendarski mesec',
+                                        '35' => '35 - kalendarska godina',
+                                        '432' => '432 - drugi period',
+                                    ]),
+                            ])
+                            ->columns(3),
+
                         Section::make('Stavke fakture')
                             ->description('Stavke sa cenama')
                             ->schema([
@@ -351,7 +393,7 @@ class InvoiceForm
 
                                         $currency = $get('currency') ?? 'RSD';
 
-                                        return new \Illuminate\Support\HtmlString('<div class="text-2xl font-bold text-blue-600">'.number_format($total, 2).' '.$currency.'</div>');
+                                        return new HtmlString('<div class="text-2xl font-bold text-blue-600">'.number_format($total, 2).' '.$currency.'</div>');
                                     })
                                     ->live()
                                     ->columnSpanFull(),

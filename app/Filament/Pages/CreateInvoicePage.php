@@ -116,12 +116,16 @@ class CreateInvoicePage extends Page implements HasForms
             'client_id' => null,
             'invoice_number' => '',
             'issue_date' => now()->format('Y-m-d'),
+            'delivery_date' => now()->format('Y-m-d'),
             'due_date' => now()->addDays(30)->format('Y-m-d'),
             'trading_place' => 'Beograd',
             'currency' => 'RSD',
             'description' => null,
             'status' => 'in_preparation',
             'bank_account_id' => null,
+            'order_reference' => null,
+            'contract_reference' => null,
+            'lot_reference' => null,
             'invoice_items' => [
                 [
                     'type' => 'service',
@@ -147,12 +151,16 @@ class CreateInvoicePage extends Page implements HasForms
                     'client_id' => $sourceInvoice->client_id,
                     'invoice_number' => '',
                     'issue_date' => now()->format('Y-m-d'),
+                    'delivery_date' => now()->format('Y-m-d'),
                     'due_date' => now()->addDays(30)->format('Y-m-d'),
                     'trading_place' => $sourceInvoice->trading_place,
                     'currency' => $sourceInvoice->currency,
                     'description' => $sourceInvoice->description,
                     'status' => 'in_preparation',
                     'bank_account_id' => $sourceInvoice->bank_account_id,
+                    'order_reference' => $sourceInvoice->order_reference,
+                    'contract_reference' => $sourceInvoice->contract_reference,
+                    'lot_reference' => $sourceInvoice->lot_reference,
                     'invoice_items' => $sourceInvoice->items->map(function ($item) {
                         return [
                             'type' => $item->type,
@@ -199,12 +207,16 @@ class CreateInvoicePage extends Page implements HasForms
                     'client_id' => $profaktura->client_id,
                     'invoice_number' => '',
                     'issue_date' => now()->format('Y-m-d'),
+                    'delivery_date' => now()->format('Y-m-d'),
                     'due_date' => now()->addDays(30)->format('Y-m-d'),
                     'trading_place' => $profaktura->trading_place,
                     'currency' => $profaktura->currency,
                     'description' => 'Faktura na osnovu profakture '.$profaktura->invoice_number.' od '.$profaktura->issue_date->format('d.m.Y'),
                     'status' => 'in_preparation',
                     'bank_account_id' => $profaktura->bank_account_id,
+                    'order_reference' => $profaktura->order_reference,
+                    'contract_reference' => $profaktura->contract_reference,
+                    'lot_reference' => $profaktura->lot_reference,
                     'invoice_items' => $profaktura->items->map(function ($item) {
                         return [
                             'type' => $item->type,
@@ -484,6 +496,12 @@ class CreateInvoicePage extends Page implements HasForms
                         ->required()
                         ->default(now()),
 
+                    DatePicker::make('delivery_date')
+                        ->label('Datum prometa')
+                        ->helperText('Obavezan datum za slanje fakture kroz SEF.')
+                        ->required()
+                        ->default(now()),
+
                     DatePicker::make('due_date')
                         ->label(__('create_invoice.fields.due_date.label'))
                         ->required()
@@ -579,6 +597,19 @@ class CreateInvoicePage extends Page implements HasForms
                         ->columnSpanFull(),
                 ])
                 ->columns(2),
+
+            Section::make('SEF podaci za budžetskog korisnika')
+                ->description('SEF zahteva najmanje jedan stvarni broj: narudžbenice, ugovora ili partije.')
+                ->visible(fn (Get $get): bool => filled(Client::find($get('client_id'))?->jbkjs))
+                ->schema([
+                    TextInput::make('order_reference')
+                        ->label('Broj narudžbenice'),
+                    TextInput::make('contract_reference')
+                        ->label('Broj ugovora'),
+                    TextInput::make('lot_reference')
+                        ->label('Broj partije'),
+                ])
+                ->columns(3),
 
             Section::make(__('create_invoice.sections.invoice_items.title'))
                 ->description(__('create_invoice.sections.invoice_items.description'))
@@ -774,8 +805,12 @@ class CreateInvoicePage extends Page implements HasForms
             'invoice_type' => $data['invoice_type'],
             'invoice_document_type' => 'faktura',
             'issue_date' => $data['issue_date'],
+            'delivery_date' => $data['delivery_date'],
             'due_date' => $data['due_date'],
             'trading_place' => $data['trading_place'],
+            'order_reference' => $data['order_reference'] ?? null,
+            'contract_reference' => $data['contract_reference'] ?? null,
+            'lot_reference' => $data['lot_reference'] ?? null,
             'currency' => $data['currency'],
             'description' => $data['description'],
             'status' => $status,

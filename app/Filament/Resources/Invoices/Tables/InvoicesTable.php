@@ -3,8 +3,12 @@
 namespace App\Filament\Resources\Invoices\Tables;
 
 use App\Helpers\FilamentHelper;
+use App\Models\EfakturaInvoice;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Services\Sef\InvoiceValidator;
+use App\Services\Sef\RecipientResolver;
+use App\Services\Sef\VatProfileResolver;
 use App\Services\SefService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -543,6 +547,21 @@ class InvoicesTable
                                 return;
                             }
 
+                            $validation = (new InvoiceValidator(
+                                new VatProfileResolver($sefService),
+                                new RecipientResolver($sefService),
+                            ))->validate($record);
+
+                            if ($validation->hasErrors()) {
+                                Notification::make()
+                                    ->title('Faktura nije spremna za SEF')
+                                    ->body(implode(' ', $validation->errors))
+                                    ->danger()
+                                    ->send();
+
+                                return;
+                            }
+
                             // Generate UBL XML from invoice
                             try {
                                 Log::info('eFaktura send action triggered', [
@@ -559,14 +578,17 @@ class InvoicesTable
                                     'xml_length' => strlen($xmlContent),
                                 ]);
 
+                                $efakturaInvoice = EfakturaInvoice::forSubmission($record);
+
                                 $response = $sefService->sendInvoice(
                                     $xmlContent,
                                     ! empty($record->client->jbkjs) ? 'Yes' : 'No',
+                                    $efakturaInvoice->sef_request_id,
                                 );
 
                                 if (isset($response['error'])) {
                                     // Update existing record or create new one
-                                    \App\Models\EfakturaInvoice::updateOrCreate(
+                                    EfakturaInvoice::updateOrCreate(
                                         ['invoice_id' => $record->id],
                                         [
                                             'user_id' => $record->user_id,
@@ -593,13 +615,13 @@ class InvoicesTable
                                 }
 
                                 // Update existing record or create new one
-                                $efakturaInvoice = \App\Models\EfakturaInvoice::updateOrCreate(
+                                $efakturaInvoice = EfakturaInvoice::updateOrCreate(
                                     ['invoice_id' => $record->id],
                                     [
                                         'user_id' => $record->user_id,
                                         'sef_invoice_id' => $response['SalesInvoiceId'] ?? $response['salesInvoiceId'] ?? $response['InvoiceId'] ?? $response['invoiceId'] ?? $response['id'] ?? null,
                                         'sef_invoice_number' => $response['InvoiceNumber'] ?? $response['invoiceNumber'] ?? null,
-                                        'sef_request_id' => $response['RequestId'] ?? $response['requestId'] ?? null,
+                                        'sef_request_id' => $response['RequestId'] ?? $response['requestId'] ?? $efakturaInvoice->sef_request_id,
                                         'status' => 'sent',
                                         'sent_at' => now(),
                                         'last_error' => null,

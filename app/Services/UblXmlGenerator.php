@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Invoice;
+use App\Services\Sef\VatProfile;
 use App\Services\Sef\VatProfileResolver;
 use DOMDocument;
 use DOMElement;
@@ -100,9 +101,21 @@ class UblXmlGenerator
             $this->addElement($root, 'cbc:AccountingCost', $invoice->trading_place);
         }
 
-        if (! empty($invoice->client->jbkjs)) {
+        $this->addInvoicePeriod($root, $invoice);
+
+        if (filled($invoice->order_reference)) {
             $orderReference = $this->createElement($root, 'cac:OrderReference');
-            $this->addElement($orderReference, 'cbc:ID', $invoice->invoice_number);
+            $this->addElement($orderReference, 'cbc:ID', $invoice->order_reference);
+        }
+
+        if (filled($invoice->contract_reference)) {
+            $contractReference = $this->createElement($root, 'cac:ContractDocumentReference');
+            $this->addElement($contractReference, 'cbc:ID', $invoice->contract_reference);
+        }
+
+        if (filled($invoice->lot_reference)) {
+            $lotReference = $this->createElement($root, 'cac:AdditionalDocumentReference');
+            $this->addElement($lotReference, 'cbc:ID', $invoice->lot_reference);
         }
 
         // Add Supplier Party (Your Company)
@@ -113,8 +126,8 @@ class UblXmlGenerator
 
         // Add Delivery (required by SEF) - must come after parties
         $delivery = $this->createElement($root, 'cac:Delivery');
-        // Use invoice delivery_date if available, otherwise use today's date in Serbian timezone
-        $deliveryDate = $invoice->delivery_date ?? now()->timezone('Europe/Belgrade');
+        // The statutory delivery date must be included in every SEF invoice.
+        $deliveryDate = $invoice->delivery_date ?? $invoice->issue_date ?? now()->timezone('Europe/Belgrade');
         $this->addElement($delivery, 'cbc:ActualDeliveryDate', $deliveryDate->timezone('Europe/Belgrade')->format('Y-m-d'));
 
         // Add Payment Means
@@ -130,6 +143,25 @@ class UblXmlGenerator
         $this->addInvoiceLines($root, $invoice);
 
         return $this->doc->saveXML();
+    }
+
+    private function addInvoicePeriod(DOMElement $root, Invoice $invoice): void
+    {
+        if (blank($invoice->invoice_period_description_code)) {
+            return;
+        }
+
+        $invoicePeriod = $this->createElement($root, 'cac:InvoicePeriod');
+
+        if ($invoice->invoice_period_start_date) {
+            $this->addElement($invoicePeriod, 'cbc:StartDate', $invoice->invoice_period_start_date->format('Y-m-d'));
+        }
+
+        if ($invoice->invoice_period_end_date) {
+            $this->addElement($invoicePeriod, 'cbc:EndDate', $invoice->invoice_period_end_date->format('Y-m-d'));
+        }
+
+        $this->addElement($invoicePeriod, 'cbc:DescriptionCode', $invoice->invoice_period_description_code);
     }
 
     /**
@@ -456,11 +488,11 @@ class UblXmlGenerator
     /**
      * Resolve VAT profile for an invoice
      */
-    private function resolveVatProfile(Invoice $invoice): \App\Services\Sef\VatProfile
+    private function resolveVatProfile(Invoice $invoice): VatProfile
     {
         if (! $this->vatProfileResolver) {
             // Fallback if resolvers not initialized
-            return new \App\Services\Sef\VatProfile(
+            return new VatProfile(
                 categoryId: 'O',
                 percent: 0,
                 exemptionReasonCode: null,

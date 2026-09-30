@@ -7,6 +7,7 @@ use App\Models\Invoice;
 class InvoiceValidator
 {
     private VatProfileResolver $vatProfileResolver;
+
     private RecipientResolver $recipientResolver;
 
     public function __construct(
@@ -29,26 +30,30 @@ class InvoiceValidator
         $invoice->load(['client', 'user.userCompany', 'items', 'bankAccount']);
 
         // 1. Validate client has required fields
-        if (!$invoice->client) {
+        if (! $invoice->client) {
             $errors[] = 'Invoice must have a client';
+
             return new ValidationResult(false, $errors, $warnings);
         }
 
         // 2. Validate client PIB
-        if (!$invoice->client->tax_id) {
+        if (! $invoice->client->tax_id) {
             $errors[] = 'Client must have a PIB (tax_id)';
         }
 
         // 3. Validate client eFaktura status
-        if ($invoice->client->efaktura_status !== 'active' && !$invoice->client->allow_efaktura_bypass) {
+        if ($invoice->client->efaktura_status !== 'active' && ! $invoice->client->allow_efaktura_bypass) {
             $errors[] = 'Client is not registered in eFaktura system';
         }
 
-        // 4. Validate budget user has JBKJS
-        if (!empty($invoice->client->jbkjs)) {
-            // This is a budget user
+        // 4. Validate budget user data required by SEF.
+        if (! empty($invoice->client->jbkjs)) {
             if (strlen($invoice->client->jbkjs) < 3) {
                 $errors[] = 'Budget user JBKJS code is invalid';
+            }
+
+            if (blank($invoice->order_reference) && blank($invoice->contract_reference) && blank($invoice->lot_reference)) {
+                $errors[] = 'Za budžetskog korisnika unesite broj narudžbenice, ugovora ili partije.';
             }
         }
 
@@ -64,6 +69,11 @@ class InvoiceValidator
             $errors = array_merge($errors, $vatErrors);
         }
 
+        if (in_array($vatProfile->categoryId, ['S10', 'S20'], true)
+            && ! in_array($invoice->invoice_period_description_code, ['3', '35', '432'], true)) {
+            $errors[] = 'Za SEF PDV kategoriju S10 ili S20 izaberite ispravnu šifru perioda obračuna PDV-a.';
+        }
+
         // 6. Validate invoice has items
         if ($invoice->items->isEmpty()) {
             $errors[] = 'Invoice must have at least one item';
@@ -74,23 +84,29 @@ class InvoiceValidator
             $errors[] = 'Invoice amount must be greater than 0';
         }
 
+        if (! $invoice->delivery_date) {
+            $errors[] = 'Datum prometa je obavezan za SEF fakturu.';
+        } elseif ($invoice->delivery_date->isAfter(now('Europe/Belgrade')->startOfDay())) {
+            $errors[] = 'Datum prometa ne može biti nakon datuma izdavanja u SEF-u.';
+        }
+
         // 8. Validate bank account
-        if (!$invoice->bankAccount) {
+        if (! $invoice->bankAccount) {
             $warnings[] = 'Invoice has no bank account - payment instructions will be incomplete';
         }
 
         // 9. Validate user company details
-        if (!$invoice->user->userCompany) {
+        if (! $invoice->user->userCompany) {
             $errors[] = 'User must have company details configured';
         } else {
             $company = $invoice->user->userCompany;
-            if (!$company->company_tax_id) {
+            if (! $company->company_tax_id) {
                 $errors[] = 'User company must have PIB';
             }
-            if (!$company->company_name) {
+            if (! $company->company_name) {
                 $errors[] = 'User company must have name';
             }
-            if (!$company->company_address) {
+            if (! $company->company_address) {
                 $warnings[] = 'User company address is missing';
             }
         }
@@ -120,22 +136,22 @@ class ValidationResult
 
     public function hasErrors(): bool
     {
-        return !$this->isValid;
+        return ! $this->isValid;
     }
 
     public function hasWarnings(): bool
     {
-        return !empty($this->warnings);
+        return ! empty($this->warnings);
     }
 
     public function getMessage(): string
     {
         if ($this->hasErrors()) {
-            return 'Validation failed: ' . implode(', ', $this->errors);
+            return 'Validation failed: '.implode(', ', $this->errors);
         }
 
         if ($this->hasWarnings()) {
-            return 'Validation passed with warnings: ' . implode(', ', $this->warnings);
+            return 'Validation passed with warnings: '.implode(', ', $this->warnings);
         }
 
         return 'Validation passed';

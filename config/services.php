@@ -48,7 +48,7 @@ return [
 
     'sef' => [
         'api_key' => env('SEF_API_KEY'),
-        'base_url' => env('SEF_BASE_URL', 'https://suf.purs.gov.rs/api'),
+        'base_url' => env('SEF_BASE_URL', 'https://efaktura.mfin.gov.rs/api'),
         'timeout' => env('SEF_TIMEOUT', 30),
         'connect_timeout' => env('SEF_CONNECT_TIMEOUT', 10),
         'verify_ssl' => env('SEF_VERIFY_SSL', true),

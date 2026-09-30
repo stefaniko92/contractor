@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Services\SefService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class EfakturaInvoice extends Model
 {
@@ -48,6 +50,24 @@ class EfakturaInvoice extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public static function forSubmission(Invoice $invoice): self
+    {
+        $sefInvoice = static::query()->firstOrCreate(
+            ['invoice_id' => $invoice->id],
+            [
+                'user_id' => $invoice->user_id,
+                'sef_request_id' => (string) Str::uuid(),
+                'status' => 'pending',
+            ],
+        );
+
+        if (blank($sefInvoice->sef_request_id)) {
+            $sefInvoice->update(['sef_request_id' => (string) Str::uuid()]);
+        }
+
+        return $sefInvoice->refresh();
     }
 
     /**
@@ -96,7 +116,7 @@ class EfakturaInvoice extends Model
             ];
         }
 
-        $sefService = \App\Services\SefService::forUser($this->user_id);
+        $sefService = SefService::forUser($this->user_id);
         $response = $sefService->getInvoiceStatus($this->sef_invoice_id);
 
         if (isset($response['error'])) {

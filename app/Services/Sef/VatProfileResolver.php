@@ -161,6 +161,12 @@ class VatProfileResolver
         // Validate exemption reason exists in SEF
         if ($profile->exemptionReasonCode) {
             $validReasons = $this->getExemptionReasons();
+            if ($validReasons === []) {
+                $errors[] = 'SEF nije vratio listu važećih razloga oslobođenja od PDV-a.';
+
+                return $errors;
+            }
+
             $found = false;
             foreach ($validReasons as $reason) {
                 if ($reason['code'] === $profile->exemptionReasonCode) {
@@ -173,7 +179,7 @@ class VatProfileResolver
                     'code' => $profile->exemptionReasonCode,
                     'available_codes' => array_column($validReasons, 'code'),
                 ]);
-                // Don't fail validation, just warn
+                $errors[] = "Razlog oslobođenja od PDV-a {$profile->exemptionReasonCode} nije važeći u SEF-u.";
             }
         }
 
