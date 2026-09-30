@@ -168,7 +168,7 @@ class InvoiceDocumentFlowService
                 'credit_note_reason' => $reason,
                 'description' => "Knjižno odobrenje za fakturu {$originalInvoice->invoice_number}: {$reason}",
                 'amount' => 0,
-                'status' => 'in_preparation',
+                'status' => 'issued',
             ]);
 
             InvoiceItem::create([

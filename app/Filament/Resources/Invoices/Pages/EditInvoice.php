@@ -43,24 +43,6 @@ class EditInvoice extends EditRecord
                 ->url(fn () => route('invoices.download', $this->record))
                 ->openUrlInNewTab(),
 
-            Action::make('mark_as_sent')
-                ->label('Označi kao poslatu')
-                ->icon('heroicon-o-paper-airplane')
-                ->color('info')
-                ->requiresConfirmation()
-                ->modalHeading('Označi fakturu kao poslatu')
-                ->modalDescription(fn () => "Da li ste sigurni da želite da označite fakturu {$this->record->invoice_number} kao poslatu?")
-                ->visible(fn () => ! $this->record->is_storno && $this->record->status !== 'sent')
-                ->action(function () {
-                    $this->record->update(['status' => 'sent']);
-
-                    Notification::make()
-                        ->title('Faktura je označena kao poslata')
-                        ->body("Status fakture {$this->record->invoice_number} je uspešno promenjen u \"Poslana\".")
-                        ->success()
-                        ->send();
-                }),
-
             DeleteAction::make(),
         ];
     }
@@ -113,7 +95,7 @@ class EditInvoice extends EditRecord
                 ->label('Unesi plaćanje')
                 ->icon('heroicon-o-currency-dollar')
                 ->color('success')
-                ->visible(fn () => ! $this->record->is_storno)
+                ->visible(fn () => ! $this->record->is_storno && $this->record->status !== 'charged')
                 ->form([
                     DatePicker::make('payment_date')
                         ->label('Datum plaćanja')
@@ -168,10 +150,7 @@ class EditInvoice extends EditRecord
                 ->modalDescription(fn () => "Da li ste sigurni da želite da stornirate fakturu {$this->record->invoice_number}? Biće kreirana nova storno faktura sa negativnim iznosima u skladu sa srpskim zakonskim propisima. Obe fakture će biti zabeležene u knjizi prihoda.")
                 ->modalSubmitActionLabel(__('actions.storno'))
                 ->modalIcon('heroicon-o-exclamation-triangle')
-                ->visible(fn () => $this->record->invoice_document_type === 'faktura'
-                    && ! $this->record->is_storno
-                    && $this->record->status !== 'in_preparation'
-                    && $this->record->stornoInvoices()->count() === 0)
+                ->visible(fn () => $this->canStornoInvoice())
                 ->action(function () {
                     $stornoInvoice = Invoice::create([
                         'user_id' => $this->record->user_id,
@@ -236,10 +215,7 @@ class EditInvoice extends EditRecord
                         ->required()
                         ->maxLength(1000),
                 ])
-                ->visible(fn (): bool => $this->record->invoice_document_type === 'faktura'
-                    && ! $this->record->is_storno
-                    && $this->record->status !== 'in_preparation'
-                    && app(InvoiceDocumentFlowService::class)->availableCreditAmount($this->record) > 0)
+                ->visible(fn (): bool => $this->canCreateCreditNote())
                 ->action(function (array $data) {
                     try {
                         $creditNote = app(InvoiceDocumentFlowService::class)->createCreditNote(
@@ -289,10 +265,7 @@ class EditInvoice extends EditRecord
                 ->modalCancelActionLabel(__('actions.no'))
                 ->modalIcon('heroicon-o-envelope')
                 ->modalWidth(FilamentHelper::getModalSizeForContext('efaktura_modal'))
-                ->visible(fn () => ! $this->record->is_storno && (
-                    $this->record->efakturaInvoice === null ||
-                    $this->record->efakturaInvoice->status === 'failed'
-                ))
+                ->visible(fn (): bool => $this->canSendToSef())
                 ->action(function (array $data) {
                     $dueDate = $data['due_date'] ?? now()->addDays(30);
 
@@ -545,5 +518,35 @@ class EditInvoice extends EditRecord
                     }
                 }),
         ];
+    }
+
+    private function canSendToSef(): bool
+    {
+        return (bool) $this->record->client?->is_domestic
+            && ! $this->record->is_storno
+            && $this->record->status !== 'in_preparation'
+            && ($this->record->efakturaInvoice === null || $this->record->efakturaInvoice->status === 'failed');
+    }
+
+    private function hasSuccessfulSefSubmission(): bool
+    {
+        return in_array($this->record->efakturaInvoice?->status, ['sent', 'delivered', 'accepted'], true);
+    }
+
+    private function canStornoInvoice(): bool
+    {
+        return $this->record->invoice_document_type === 'faktura'
+            && ! $this->record->is_storno
+            && $this->record->status !== 'in_preparation'
+            && ! $this->hasSuccessfulSefSubmission()
+            && $this->record->stornoInvoices()->doesntExist();
+    }
+
+    private function canCreateCreditNote(): bool
+    {
+        return $this->record->invoice_document_type === 'faktura'
+            && ! $this->record->is_storno
+            && $this->hasSuccessfulSefSubmission()
+            && app(InvoiceDocumentFlowService::class)->availableCreditAmount($this->record) > 0;
     }
 }

@@ -322,24 +322,6 @@ class InvoicesTable
                             ->send();
                     }),
 
-                Action::make('mark_as_sent')
-                    ->label('Označi kao poslatu')
-                    ->icon('heroicon-o-paper-airplane')
-                    ->color('info')
-                    ->visible(fn ($record) => ! $record->is_storno && $record->status !== 'sent')
-                    ->requiresConfirmation()
-                    ->modalHeading('Označi fakturu kao poslatu')
-                    ->modalDescription(fn ($record) => "Da li ste sigurni da želite da označite fakturu {$record->invoice_number} kao poslatu?")
-                    ->action(function ($record) {
-                        $record->update(['status' => 'sent']);
-
-                        Notification::make()
-                            ->title('Faktura je označena kao poslata')
-                            ->body("Status fakture {$record->invoice_number} je uspešno promenjen u \"Poslana\".")
-                            ->success()
-                            ->send();
-                    }),
-
                 ActionGroup::make([
                     EditAction::make()
                         ->label('Uredi')
@@ -380,12 +362,7 @@ class InvoicesTable
                         })
                         ->modalSubmitActionLabel(__('actions.storno'))
                         ->modalIcon('heroicon-o-exclamation-triangle')
-                        ->visible(function ($record) {
-                            return $record->invoice_document_type === 'faktura'
-                                && ! $record->is_storno
-                                && $record->status !== 'in_preparation'
-                                && $record->stornoInvoices()->count() === 0;
-                        })
+                        ->visible(fn (Invoice $record): bool => self::canStornoInvoice($record))
                         ->action(function ($record) {
                             // Create storno (reversal) invoice with negative amounts
                             $stornoInvoice = Invoice::create([
@@ -454,12 +431,7 @@ class InvoicesTable
                                 ->required()
                                 ->maxLength(1000),
                         ])
-                        ->visible(function (Invoice $record): bool {
-                            return $record->invoice_document_type === 'faktura'
-                                && ! $record->is_storno
-                                && $record->status !== 'in_preparation'
-                                && app(InvoiceDocumentFlowService::class)->availableCreditAmount($record) > 0;
-                        })
+                        ->visible(fn (Invoice $record): bool => self::canCreateCreditNote($record))
                         ->action(function (array $data, Invoice $record) {
                             try {
                                 $creditNote = app(InvoiceDocumentFlowService::class)->createCreditNote(
@@ -482,24 +454,6 @@ class InvoicesTable
                                     ->danger()
                                     ->send();
                             }
-                        }),
-
-                    Action::make('send')
-                        ->label('Pošalji')
-                        ->icon('heroicon-o-paper-airplane')
-                        ->color('info')
-                        ->visible(fn ($record) => ! $record->is_storno && $record->status !== 'sent')
-                        ->requiresConfirmation()
-                        ->modalHeading('Označi fakturu kao poslatu')
-                        ->modalDescription(fn ($record) => "Da li ste sigurni da želite da označite fakturu {$record->invoice_number} kao poslatu?")
-                        ->action(function ($record) {
-                            $record->update(['status' => 'sent']);
-
-                            Notification::make()
-                                ->title('Faktura je označena kao poslata')
-                                ->body("Status fakture {$record->invoice_number} je uspešno promenjen u \"Poslana\".")
-                                ->success()
-                                ->send();
                         }),
 
                     Action::make('send_to_efaktura')
@@ -531,13 +485,7 @@ class InvoicesTable
                         ->modalCancelActionLabel(__('actions.no'))
                         ->modalIcon('heroicon-o-envelope')
                         ->modalWidth(FilamentHelper::getModalSizeForContext('efaktura_modal'))
-                        ->visible(function ($record) {
-                            // Show if not sent to eFaktura yet, or if previous send failed
-                            return ! $record->is_storno && (
-                                $record->efakturaInvoice === null ||
-                                $record->efakturaInvoice->status === 'failed'
-                            );
-                        })
+                        ->visible(fn (Invoice $record): bool => self::canSendToSef($record))
                         ->action(function (array $data, $record) {
                             $dueDate = $data['due_date'] ?? now()->addDays(30);
 
@@ -815,32 +763,6 @@ class InvoicesTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    BulkAction::make('mark_as_sent')
-                        ->label('Označi kao poslate')
-                        ->icon('heroicon-o-paper-airplane')
-                        ->color('info')
-                        ->requiresConfirmation()
-                        ->modalHeading('Označi fakture kao poslate')
-                        ->modalDescription('Sve izabrane fakture koje nisu storno biće označene kao poslate.')
-                        ->modalSubmitActionLabel(__('actions.mark_as_sent'))
-                        ->deselectRecordsAfterCompletion()
-                        ->action(function (Collection $records): void {
-                            $count = 0;
-
-                            foreach ($records as $record) {
-                                if (! $record->is_storno && $record->status !== 'sent') {
-                                    $record->update(['status' => 'sent']);
-                                    $count++;
-                                }
-                            }
-
-                            Notification::make()
-                                ->title('Fakture označene kao poslate')
-                                ->body("Uspešno je označeno {$count} faktura/e kao poslato.")
-                                ->success()
-                                ->send();
-                        }),
-
                     BulkAction::make('mark_as_paid')
                         ->label('Označi kao plaćeno')
                         ->icon('heroicon-o-check-circle')
@@ -881,5 +803,35 @@ class InvoicesTable
                         ),
                 ]),
             ]);
+    }
+
+    private static function canSendToSef(Invoice $invoice): bool
+    {
+        return (bool) $invoice->client?->is_domestic
+            && ! $invoice->is_storno
+            && $invoice->status !== 'in_preparation'
+            && ($invoice->efakturaInvoice === null || $invoice->efakturaInvoice->status === 'failed');
+    }
+
+    private static function hasSuccessfulSefSubmission(Invoice $invoice): bool
+    {
+        return in_array($invoice->efakturaInvoice?->status, ['sent', 'delivered', 'accepted'], true);
+    }
+
+    private static function canStornoInvoice(Invoice $invoice): bool
+    {
+        return $invoice->invoice_document_type === 'faktura'
+            && ! $invoice->is_storno
+            && $invoice->status !== 'in_preparation'
+            && ! self::hasSuccessfulSefSubmission($invoice)
+            && $invoice->stornoInvoices()->doesntExist();
+    }
+
+    private static function canCreateCreditNote(Invoice $invoice): bool
+    {
+        return $invoice->invoice_document_type === 'faktura'
+            && ! $invoice->is_storno
+            && self::hasSuccessfulSefSubmission($invoice)
+            && app(InvoiceDocumentFlowService::class)->availableCreditAmount($invoice) > 0;
     }
 }

@@ -206,7 +206,9 @@ class AvansnaFakturasTable
                             ->required()
                             ->native(false),
                     ])
-                    ->visible(fn (Invoice $record): bool => ! $record->is_storno
+                    ->visible(fn (Invoice $record): bool => (bool) $record->client?->is_domestic
+                        && ! $record->is_storno
+                        && $record->status !== 'in_preparation'
                         && ($record->efakturaInvoice === null || $record->efakturaInvoice->status === 'failed'))
                     ->action(function (array $data, Invoice $record): void {
                         $record->update(['due_date' => $data['due_date']]);

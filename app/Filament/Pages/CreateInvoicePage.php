@@ -879,13 +879,6 @@ class CreateInvoicePage extends Page implements HasForms
                 ->submit('saveAsDraft')
                 ->extraAttributes(['class' => 'mt-6']),
 
-            Action::make('send')
-                ->label(__('create_invoice.actions.issue_and_send'))
-                ->icon('heroicon-o-paper-airplane')
-                ->color('gray')
-                ->submit('issueAndSend')
-                ->extraAttributes(['class' => 'mt-6']),
-
             Action::make('issue')
                 ->label(__('create_invoice.actions.issue'))
                 ->icon('heroicon-o-check-circle')
@@ -903,11 +896,6 @@ class CreateInvoicePage extends Page implements HasForms
     public function issueInvoice(): void
     {
         $this->createInvoice('issued');
-    }
-
-    public function issueAndSend(): void
-    {
-        $this->createInvoice('sent');
     }
 
     protected function updateDiscountTypeOptions(string $currency): void

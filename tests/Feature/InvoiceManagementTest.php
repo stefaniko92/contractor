@@ -84,19 +84,14 @@ class InvoiceManagementTest extends TestCase
         ]);
     }
 
-    public function test_edit_invoice_action_can_mark_invoice_as_sent(): void
+    public function test_edit_invoice_page_does_not_show_a_manual_sent_action(): void
     {
         $client = $this->createClient();
         $invoice = $this->createInvoice($client);
 
         Livewire::test(EditInvoice::class, [
             'record' => $invoice->getRouteKey(),
-        ])->callAction('mark_as_sent');
-
-        $this->assertDatabaseHas('invoices', [
-            'id' => $invoice->id,
-            'status' => 'sent',
-        ]);
+        ])->assertDontSee('Označi kao poslatu');
     }
 
     public function test_invoice_total_is_recalculated_when_an_invoice_item_is_saved(): void
@@ -180,38 +175,21 @@ class InvoiceManagementTest extends TestCase
         ]);
     }
 
-    public function test_bulk_action_marks_selected_invoices_as_sent(): void
+    public function test_table_hides_sef_actions_for_foreign_invoices(): void
     {
-        $client = $this->createClient();
-        $firstInvoice = $this->createInvoice($client, [
+        $client = $this->createClient([
+            'is_domestic' => false,
+            'currency' => 'USD',
+        ]);
+        $invoice = $this->createInvoice($client, [
             'invoice_number' => '1/2026',
-            'status' => 'in_preparation',
-        ]);
-        $secondInvoice = $this->createInvoice($client, [
-            'invoice_number' => '2/2026',
             'status' => 'issued',
-        ]);
-        $stornoInvoice = $this->createInvoice($client, [
-            'invoice_number' => '3/2026',
-            'status' => 'storned',
-            'is_storno' => true,
+            'currency' => 'USD',
         ]);
 
         Livewire::test(ListInvoices::class)
-            ->callTableBulkAction('mark_as_sent', [$firstInvoice, $secondInvoice, $stornoInvoice]);
-
-        $this->assertDatabaseHas('invoices', [
-            'id' => $firstInvoice->id,
-            'status' => 'sent',
-        ]);
-        $this->assertDatabaseHas('invoices', [
-            'id' => $secondInvoice->id,
-            'status' => 'sent',
-        ]);
-        $this->assertDatabaseHas('invoices', [
-            'id' => $stornoInvoice->id,
-            'status' => 'storned',
-        ]);
+            ->assertTableActionHidden('send_to_efaktura', $invoice)
+            ->assertTableActionHidden('create_credit_note', $invoice);
     }
 
     public function test_pausal_income_excludes_drafts_and_storno_invoices(): void
