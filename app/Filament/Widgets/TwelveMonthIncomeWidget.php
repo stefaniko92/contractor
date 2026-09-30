@@ -2,7 +2,7 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\Invoice;
+use App\PausalIncomeAnalytics;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Auth;
@@ -20,41 +20,26 @@ class TwelveMonthIncomeWidget extends StatsOverviewWidget
 
     protected function getStats(): array
     {
-        $userId = Auth::id();
-
-        $twelveMonthsAgo = now()->subMonths(12);
-
-        $twelveMonthIncome = Invoice::where('invoices.user_id', $userId)
-            ->countsTowardsPausalIncome()
-            ->join('clients', 'invoices.client_id', '=', 'clients.id')
-            ->where('clients.is_domestic', true)
-            ->where('invoices.issue_date', '>=', $twelveMonthsAgo)
-            ->whereNotNull('invoices.issue_date')
-            ->sum('invoices.amount');
-
-        // Limit for last 12 months (8 million RSD)
-        $twelveMonthLimit = 8000000;
-        $remainingTwelveMonth = $twelveMonthLimit - $twelveMonthIncome;
-        $percentageUsedTwelveMonth = ($twelveMonthIncome / $twelveMonthLimit) * 100;
+        $analytics = app(PausalIncomeAnalytics::class)->forDate(Auth::id(), now());
 
         $color = 'success';
-        if ($percentageUsedTwelveMonth > 80) {
+        if ($analytics['percentage_used'] > 80) {
             $color = 'danger';
-        } elseif ($percentageUsedTwelveMonth > 60) {
+        } elseif ($analytics['percentage_used'] > 60) {
             $color = 'warning';
         }
 
-        $icon = $percentageUsedTwelveMonth > 80 ? 'heroicon-m-exclamation-triangle' : 'heroicon-m-check-circle';
+        $icon = $analytics['percentage_used'] > 80 ? 'heroicon-m-exclamation-triangle' : 'heroicon-m-check-circle';
 
         return [
-            Stat::make('Prihod u 12 meseci', number_format($twelveMonthIncome, 0, ',', '.').' RSD')
-                ->description('Od ukupno '.number_format($twelveMonthLimit, 0, ',', '.').' RSD')
+            Stat::make('Prihod u 365 dana', number_format($analytics['income'], 0, ',', '.').' RSD')
+                ->description('Od ukupno '.number_format($analytics['limit'], 0, ',', '.').' RSD')
                 ->descriptionIcon('heroicon-m-calendar')
                 ->color($color)
                 ->chart([12, 15, 18, 20, 22, 25, 28, 30, 32, 35, 38, 40]),
 
-            Stat::make('Preostalo do limita (12 mes.)', number_format($remainingTwelveMonth, 0, ',', '.').' RSD')
-                ->description(number_format($percentageUsedTwelveMonth, 1).'% iskorišćeno')
+            Stat::make('Preostalo do limita', number_format($analytics['remaining'], 0, ',', '.').' RSD')
+                ->description(number_format($analytics['percentage_used'], 1).'% iskorišćeno')
                 ->descriptionIcon($icon)
                 ->color($color),
         ];
