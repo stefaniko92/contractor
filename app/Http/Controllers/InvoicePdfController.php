@@ -96,6 +96,7 @@ class InvoicePdfController extends Controller
             $documentType = match ($invoice->invoice_document_type) {
                 'profaktura' => 'Profaktura',
                 'avansna_faktura' => 'Avansna-Faktura',
+                'knjizno_odobrenje' => 'Knjizno-Odobrenje',
                 default => 'Faktura'
             };
 

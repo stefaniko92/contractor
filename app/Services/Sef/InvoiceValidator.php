@@ -80,7 +80,11 @@ class InvoiceValidator
         }
 
         // 7. Validate invoice amounts
-        if ($invoice->amount <= 0) {
+        if ($invoice->invoice_document_type === 'knjizno_odobrenje' && $invoice->amount >= 0) {
+            $errors[] = 'Knjižno odobrenje mora imati negativan iznos.';
+        }
+
+        if ($invoice->invoice_document_type !== 'knjizno_odobrenje' && $invoice->amount <= 0) {
             $errors[] = 'Invoice amount must be greater than 0';
         }
 

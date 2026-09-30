@@ -37,6 +37,8 @@ class Invoice extends Model
         'original_invoice_id',
         'original_invoice_number',
         'original_invoice_date',
+        'source_profaktura_id',
+        'credit_note_reason',
     ];
 
     protected $casts = [
@@ -103,6 +105,33 @@ class Invoice extends Model
         return $this->hasMany(Invoice::class, 'original_invoice_id');
     }
 
+    public function sourceProfaktura(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class, 'source_profaktura_id');
+    }
+
+    public function advanceInvoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class, 'source_profaktura_id')
+            ->where('invoice_document_type', 'avansna_faktura');
+    }
+
+    public function advanceApplications(): HasMany
+    {
+        return $this->hasMany(InvoiceAdvanceApplication::class);
+    }
+
+    public function advanceApplicationsAsAdvance(): HasMany
+    {
+        return $this->hasMany(InvoiceAdvanceApplication::class, 'advance_invoice_id');
+    }
+
+    public function creditNotes(): HasMany
+    {
+        return $this->hasMany(Invoice::class, 'original_invoice_id')
+            ->where('invoice_document_type', 'knjizno_odobrenje');
+    }
+
     /**
      * Get the eFaktura invoice record for this invoice
      */
@@ -130,6 +159,7 @@ class Invoice extends Model
             $prefix = match ($documentType) {
                 'avansna_faktura' => 'A',
                 'profaktura' => 'P',
+                'knjizno_odobrenje' => 'KO',
                 'faktura' => '',
                 default => ''
             };

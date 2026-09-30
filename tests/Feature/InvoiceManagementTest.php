@@ -12,6 +12,7 @@ use App\Models\InvoiceItem;
 use App\Models\SefEfakturaSetting;
 use App\Models\User;
 use App\Models\UserCompany;
+use App\Services\InvoiceDocumentFlowService;
 use App\Services\Sef\InvoiceValidator;
 use App\Services\Sef\RecipientResolver;
 use App\Services\Sef\VatProfileResolver;
@@ -291,6 +292,69 @@ class InvoiceManagementTest extends TestCase
             'Za budžetskog korisnika unesite broj narudžbenice, ugovora ili partije.',
             $validation->errors,
         );
+    }
+
+    public function test_it_creates_a_final_invoice_with_a_partial_advance_from_a_profaktura(): void
+    {
+        $client = $this->createClient();
+        $profaktura = $this->createInvoice($client, [
+            'invoice_number' => 'P1/2026',
+            'invoice_document_type' => 'profaktura',
+            'amount' => 1000,
+        ]);
+        $this->createInvoiceItem($profaktura, [
+            'amount' => 1000,
+            'unit_price' => 1000,
+        ]);
+        $profaktura->updateAmount();
+
+        $flow = app(InvoiceDocumentFlowService::class);
+        $advance = $flow->createAdvanceFromProforma($profaktura, 300);
+        $this->assertSame(700.0, $flow->remainingProformaAmount($profaktura));
+        $advance->update(['status' => 'charged']);
+
+        $invoice = $flow->createFinalInvoiceFromProforma($profaktura, collect([$advance]));
+
+        $this->assertSame('avansna_faktura', $advance->invoice_document_type);
+        $this->assertSame($profaktura->id, $advance->source_profaktura_id);
+        $this->assertSame('faktura', $invoice->invoice_document_type);
+        $this->assertSame($profaktura->id, $invoice->source_profaktura_id);
+        $this->assertSame(700.0, (float) $invoice->amount);
+        $this->assertDatabaseHas('invoice_advance_applications', [
+            'invoice_id' => $invoice->id,
+            'advance_invoice_id' => $advance->id,
+            'applied_amount' => 300,
+        ]);
+        $this->assertSame(0.0, $flow->availableAdvanceAmount($advance));
+    }
+
+    public function test_it_creates_a_partial_credit_note_linked_to_the_original_invoice(): void
+    {
+        $client = $this->createClient();
+        $invoice = $this->createInvoice($client, [
+            'invoice_number' => '20/2026',
+            'amount' => 1000,
+            'status' => 'issued',
+        ]);
+        $this->createInvoiceItem($invoice, [
+            'amount' => 1000,
+            'unit_price' => 1000,
+        ]);
+        $invoice->updateAmount();
+
+        $flow = app(InvoiceDocumentFlowService::class);
+        $creditNote = $flow->createCreditNote($invoice, 250, 'Umanjenje naknade po dogovoru');
+
+        $this->assertSame('knjizno_odobrenje', $creditNote->invoice_document_type);
+        $this->assertSame($invoice->id, $creditNote->original_invoice_id);
+        $this->assertSame($invoice->invoice_number, $creditNote->original_invoice_number);
+        $this->assertSame(-250.0, (float) $creditNote->amount);
+        $this->assertSame(750.0, $flow->availableCreditAmount($invoice));
+
+        $xml = $creditNote->generateUblXml();
+        $this->assertStringContainsString('<cbc:InvoiceTypeCode>381</cbc:InvoiceTypeCode>', $xml);
+        $this->assertStringContainsString('<cac:BillingReference>', $xml);
+        $this->assertStringContainsString('<cbc:ID>20/2026</cbc:ID>', $xml);
     }
 
     public function test_foreign_invoice_preview_shows_swift_and_full_sender_details(): void

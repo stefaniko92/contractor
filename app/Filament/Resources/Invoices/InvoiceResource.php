@@ -40,7 +40,7 @@ class InvoiceResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->where('invoice_document_type', 'faktura')
+            ->whereIn('invoice_document_type', ['faktura', 'knjizno_odobrenje'])
             ->where('user_id', auth()->id());
     }
 

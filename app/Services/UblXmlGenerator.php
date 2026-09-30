@@ -108,6 +108,16 @@ class UblXmlGenerator
             $this->addElement($orderReference, 'cbc:ID', $invoice->order_reference);
         }
 
+        if ($invoice->original_invoice_id && $invoice->original_invoice_number) {
+            $billingReference = $this->createElement($root, 'cac:BillingReference');
+            $invoiceDocumentReference = $this->createElement($billingReference, 'cac:InvoiceDocumentReference');
+            $this->addElement($invoiceDocumentReference, 'cbc:ID', $invoice->original_invoice_number);
+
+            if ($invoice->original_invoice_date) {
+                $this->addElement($invoiceDocumentReference, 'cbc:IssueDate', $invoice->original_invoice_date->format('Y-m-d'));
+            }
+        }
+
         if (filled($invoice->contract_reference)) {
             $contractReference = $this->createElement($root, 'cac:ContractDocumentReference');
             $this->addElement($contractReference, 'cbc:ID', $invoice->contract_reference);
@@ -522,6 +532,7 @@ class UblXmlGenerator
         return match ($invoice->invoice_document_type) {
             'profaktura' => '325', // Proforma invoice
             'avansna_faktura' => '386', // Prepayment invoice
+            'knjizno_odobrenje' => '381', // Credit note
             default => '380', // Commercial invoice
         };
     }

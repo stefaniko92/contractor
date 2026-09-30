@@ -4,12 +4,14 @@ namespace App\Filament\Resources\AvansnaFakturas\Tables;
 
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Services\SefInvoiceSubmissionService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
@@ -189,6 +191,33 @@ class AvansnaFakturasTable
                     ->color('gray')
                     ->url(fn ($record): string => route('invoices.print', $record))
                     ->openUrlInNewTab(),
+
+                Action::make('send_to_efaktura')
+                    ->label('Pošalji na eFakturu')
+                    ->icon('heroicon-o-envelope')
+                    ->color('primary')
+                    ->requiresConfirmation()
+                    ->modalHeading('Slanje avansne fakture putem eFaktura sistema')
+                    ->modalSubmitActionLabel('Pošalji')
+                    ->form([
+                        DatePicker::make('due_date')
+                            ->label('Datum dospeća')
+                            ->default(fn (Invoice $record) => $record->due_date ?? now()->addDays(30))
+                            ->required()
+                            ->native(false),
+                    ])
+                    ->visible(fn (Invoice $record): bool => ! $record->is_storno
+                        && ($record->efakturaInvoice === null || $record->efakturaInvoice->status === 'failed'))
+                    ->action(function (array $data, Invoice $record): void {
+                        $record->update(['due_date' => $data['due_date']]);
+                        $result = app(SefInvoiceSubmissionService::class)->submit($record->refresh());
+
+                        Notification::make()
+                            ->title($result['success'] ? 'Avansna faktura je poslata na eFakturu' : 'Slanje avansne fakture nije uspelo')
+                            ->body($result['success'] ? "Faktura {$record->invoice_number} je uspešno poslata." : $result['error'])
+                            ->{$result['success'] ? 'success' : 'danger'}()
+                            ->send();
+                    }),
 
                 Action::make('delete')
                     ->label('Obriši')

@@ -2,10 +2,12 @@
 
 namespace App\Filament\Resources\Invoices\Tables;
 
+use App\Filament\Resources\Invoices\InvoiceResource;
 use App\Helpers\FilamentHelper;
 use App\Models\EfakturaInvoice;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Services\InvoiceDocumentFlowService;
 use App\Services\Sef\InvoiceValidator;
 use App\Services\Sef\RecipientResolver;
 use App\Services\Sef\VatProfileResolver;
@@ -17,6 +19,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
@@ -25,6 +28,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class InvoicesTable
 {
@@ -41,7 +45,7 @@ class InvoicesTable
                     ->width('250px'),
 
                 TextColumn::make('invoice_number')
-                    ->label('Broj fakture')
+                    ->label('Broj dokumenta')
                     ->searchable()
                     ->sortable(query: function ($query, $direction) {
                         // Custom sort for invoice numbers in format "n/year"
@@ -150,12 +154,14 @@ class InvoicesTable
                         'faktura' => 'success',
                         'profaktura' => 'info',
                         'avansna_faktura' => 'warning',
+                        'knjizno_odobrenje' => 'warning',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'faktura' => 'Faktura',
                         'profaktura' => 'Profaktura',
                         'avansna_faktura' => 'Avansna Faktura',
+                        'knjizno_odobrenje' => 'Knjižno odobrenje',
                         default => $state,
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -375,8 +381,10 @@ class InvoicesTable
                         ->modalSubmitActionLabel(__('actions.storno'))
                         ->modalIcon('heroicon-o-exclamation-triangle')
                         ->visible(function ($record) {
-                            // Only show storno action for issued invoices that are not storno invoices themselves and don't already have a storno
-                            return ! $record->is_storno && $record->status !== 'in_preparation' && $record->stornoInvoices()->count() === 0;
+                            return $record->invoice_document_type === 'faktura'
+                                && ! $record->is_storno
+                                && $record->status !== 'in_preparation'
+                                && $record->stornoInvoices()->count() === 0;
                         })
                         ->action(function ($record) {
                             // Create storno (reversal) invoice with negative amounts
@@ -424,6 +432,56 @@ class InvoicesTable
                                 ->body("Kreirana je storno faktura {$stornoInvoice->invoice_number} za originalnu fakturu {$record->invoice_number}. Obe fakture su zabeležene u knjizi prihoda u skladu sa zakonskim propisima.")
                                 ->success()
                                 ->send();
+                        }),
+
+                    Action::make('create_credit_note')
+                        ->label('Knjižno odobrenje')
+                        ->icon('heroicon-o-document-minus')
+                        ->color('warning')
+                        ->modalHeading('Kreiraj knjižno odobrenje')
+                        ->modalDescription(fn (Invoice $record): string => "Odobrenje će biti vezano za fakturu {$record->invoice_number}.")
+                        ->modalSubmitActionLabel('Kreiraj odobrenje')
+                        ->form([
+                            TextInput::make('amount')
+                                ->label('Iznos odobrenja')
+                                ->numeric()
+                                ->required()
+                                ->minValue(0.01)
+                                ->maxValue(fn (Invoice $record): float => app(InvoiceDocumentFlowService::class)->availableCreditAmount($record))
+                                ->suffix(fn (Invoice $record): string => $record->currency),
+                            Textarea::make('reason')
+                                ->label('Razlog odobrenja')
+                                ->required()
+                                ->maxLength(1000),
+                        ])
+                        ->visible(function (Invoice $record): bool {
+                            return $record->invoice_document_type === 'faktura'
+                                && ! $record->is_storno
+                                && $record->status !== 'in_preparation'
+                                && app(InvoiceDocumentFlowService::class)->availableCreditAmount($record) > 0;
+                        })
+                        ->action(function (array $data, Invoice $record) {
+                            try {
+                                $creditNote = app(InvoiceDocumentFlowService::class)->createCreditNote(
+                                    $record,
+                                    (float) $data['amount'],
+                                    $data['reason'],
+                                );
+
+                                Notification::make()
+                                    ->title('Knjižno odobrenje je kreirano')
+                                    ->body("Dokument {$creditNote->invoice_number} je vezan za fakturu {$record->invoice_number}.")
+                                    ->success()
+                                    ->send();
+
+                                return redirect()->to(InvoiceResource::getUrl('edit', ['record' => $creditNote]));
+                            } catch (ValidationException $exception) {
+                                Notification::make()
+                                    ->title('Knjižno odobrenje nije kreirano')
+                                    ->body(implode(' ', $exception->errors()['amount'] ?? $exception->errors()['reason'] ?? []))
+                                    ->danger()
+                                    ->send();
+                            }
                         }),
 
                     Action::make('send')

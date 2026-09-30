@@ -2,19 +2,25 @@
 
 namespace App\Filament\Resources\Profakturas\Tables;
 
+use App\Filament\Resources\AvansnaFakturas\AvansnaFakturaResource;
+use App\Filament\Resources\Invoices\InvoiceResource;
 use App\Models\Invoice;
+use App\Services\InvoiceDocumentFlowService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\ValidationException;
 
 class ProfakturasTable
 {
@@ -244,17 +250,91 @@ class ProfakturasTable
                         })
                         ->modalSubmitActionLabel(__('actions.create_advance_invoice'))
                         ->modalIcon('heroicon-o-document-text')
+                        ->form([
+                            TextInput::make('amount')
+                                ->label('Iznos avansa')
+                                ->numeric()
+                                ->required()
+                                ->minValue(0.01)
+                                ->default(fn (Invoice $record): float => app(InvoiceDocumentFlowService::class)->remainingProformaAmount($record))
+                                ->maxValue(fn (Invoice $record): float => app(InvoiceDocumentFlowService::class)->remainingProformaAmount($record))
+                                ->suffix(fn (Invoice $record): string => $record->currency),
+                        ])
                         ->visible(function ($record) {
-                            // Only show for non-storno profakturas
-                            return ! $record->is_storno;
+                            return ! $record->is_storno
+                                && app(InvoiceDocumentFlowService::class)->remainingProformaAmount($record) > 0;
                         })
-                        ->action(function ($record) {
-                            // TODO: Implement avans invoice creation
-                            Notification::make()
-                                ->title('Funkcija u izradi')
-                                ->body('Kreiranje avansne fakture će uskoro biti dostupno.')
-                                ->warning()
-                                ->send();
+                        ->action(function (array $data, Invoice $record) {
+                            try {
+                                $advance = app(InvoiceDocumentFlowService::class)->createAdvanceFromProforma(
+                                    $record,
+                                    (float) $data['amount'],
+                                );
+
+                                Notification::make()
+                                    ->title('Avansna faktura je kreirana')
+                                    ->body("Avansna faktura {$advance->invoice_number} je vezana za profakturu {$record->invoice_number}.")
+                                    ->success()
+                                    ->send();
+
+                                return redirect()->to(AvansnaFakturaResource::getUrl('edit', ['record' => $advance]));
+                            } catch (ValidationException $exception) {
+                                Notification::make()
+                                    ->title('Avansna faktura nije kreirana')
+                                    ->body(implode(' ', $exception->errors()['amount'] ?? $exception->errors()['profaktura'] ?? []))
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+
+                    Action::make('create_final_invoice')
+                        ->label('Kreiraj konačnu fakturu')
+                        ->icon('heroicon-o-document-check')
+                        ->color('success')
+                        ->modalHeading('Konačna faktura sa umanjenjem avansa')
+                        ->modalDescription('Izaberi naplaćene avanse koji se odbijaju od ukupnog iznosa profakture.')
+                        ->modalSubmitActionLabel('Kreiraj konačnu fakturu')
+                        ->form([
+                            CheckboxList::make('advance_invoice_ids')
+                                ->label('Naplaćene avansne fakture')
+                                ->options(function (Invoice $record): array {
+                                    $flow = app(InvoiceDocumentFlowService::class);
+
+                                    return $record->advanceInvoices()
+                                        ->where('status', 'charged')
+                                        ->get()
+                                        ->mapWithKeys(fn (Invoice $advance): array => [
+                                            $advance->id => "{$advance->invoice_number} - ".number_format($flow->availableAdvanceAmount($advance), 2)." {$advance->currency}",
+                                        ])
+                                        ->all();
+                                })
+                                ->required(),
+                        ])
+                        ->visible(function (Invoice $record): bool {
+                            return ! $record->is_storno
+                                && $record->advanceInvoices()->where('status', 'charged')->exists();
+                        })
+                        ->action(function (array $data, Invoice $record) {
+                            try {
+                                $advances = Invoice::query()
+                                    ->whereKey($data['advance_invoice_ids'])
+                                    ->get();
+                                $invoice = app(InvoiceDocumentFlowService::class)->createFinalInvoiceFromProforma($record, $advances);
+
+                                Notification::make()
+                                    ->title('Konačna faktura je kreirana')
+                                    ->body("Faktura {$invoice->invoice_number} sadrži umanjenje za izabrane avanse.")
+                                    ->success()
+                                    ->send();
+
+                                return redirect()->to(InvoiceResource::getUrl('edit', ['record' => $invoice]));
+                            } catch (ValidationException $exception) {
+                                Notification::make()
+                                    ->title('Konačna faktura nije kreirana')
+                                    ->body(implode(' ', $exception->errors()['advance_invoice_ids'] ?? $exception->errors()['profaktura'] ?? []))
+                                    ->danger()
+                                    ->send();
+                            }
                         }),
 
                     Action::make('send')
@@ -262,7 +342,11 @@ class ProfakturasTable
                         ->icon('heroicon-o-paper-airplane')
                         ->color('info')
                         ->action(function () {
-                            // TODO: Implement send functionality
+                            Notification::make()
+                                ->title('Profaktura se ne šalje na SEF')
+                                ->body('SEF se koristi za fakture, avansne fakture i knjižna odobrenja.')
+                                ->warning()
+                                ->send();
                         }),
 
                     Action::make('delete')
