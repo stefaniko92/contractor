@@ -31,4 +31,26 @@ class InvoiceItem extends Model
     {
         return $this->belongsTo(Invoice::class);
     }
+
+    protected static function booted(): void
+    {
+        static::saved(function (InvoiceItem $invoiceItem): void {
+            static::synchronizeInvoiceAmount($invoiceItem->invoice_id);
+
+            if ($invoiceItem->wasChanged('invoice_id')) {
+                static::synchronizeInvoiceAmount($invoiceItem->getOriginal('invoice_id'));
+            }
+        });
+
+        static::deleted(function (InvoiceItem $invoiceItem): void {
+            static::synchronizeInvoiceAmount($invoiceItem->invoice_id);
+        });
+    }
+
+    private static function synchronizeInvoiceAmount(?int $invoiceId): void
+    {
+        if ($invoiceId) {
+            Invoice::find($invoiceId)?->updateAmount();
+        }
+    }
 }

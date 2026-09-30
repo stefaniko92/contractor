@@ -99,6 +99,27 @@ class InvoiceManagementTest extends TestCase
         ]);
     }
 
+    public function test_invoice_total_is_recalculated_when_an_invoice_item_is_saved(): void
+    {
+        $invoice = $this->createInvoice($this->createClient(), [
+            'invoice_number' => 'TOTAL-001/2026',
+        ]);
+
+        $item = $this->createInvoiceItem($invoice, [
+            'amount' => 58700,
+            'unit_price' => 58700,
+        ]);
+
+        $this->assertSame(58700.0, (float) $invoice->refresh()->amount);
+
+        $item->update([
+            'amount' => 60000,
+            'unit_price' => 60000,
+        ]);
+
+        $this->assertSame(60000.0, (float) $invoice->refresh()->amount);
+    }
+
     public function test_create_invoice_page_issues_invoice_when_using_the_default_create_action(): void
     {
         $client = $this->createClient();
